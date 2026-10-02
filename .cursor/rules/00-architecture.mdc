@@ -1,0 +1,31 @@
+---
+description: Arquitectura y capas de la Intranet Docente
+globs:
+alwaysApply: true
+---
+
+# Arquitectura
+
+Este repositorio es solo la **Intranet Docente**. No compartir BD ni sesión con la Web Pública.
+
+## Capas backend
+
+`Router (app/api) → Service (app/services) → Persistencia (models / data)`
+
+- Routers finos: sin lógica de negocio compleja.
+- Servicios: reglas de dominio.
+- Validación de entrada con esquemas Pydantic.
+
+## API
+
+- Prefijo: `/api/v1`.
+- Contrato: `openapi/openapi.yaml` y `docs/api-contract.md`.
+- Recursos en plural; nombres completos (`justificante`, `comentarios`).
+- FEM: rutas bajo `/api/v1/fem` (no `/fct`).
+- Acciones de negocio explícitas permitidas cuando sean más claras (ej. `POST /guardias/asignar`).
+
+## Cambios
+
+Antes de crear, renombrar o eliminar un endpoint: consultar el contrato.
+Después: actualizar OpenAPI, docs y tests.
+No inventar requisitos ni stacks alternativos.

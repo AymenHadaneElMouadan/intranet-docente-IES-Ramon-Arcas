@@ -1,0 +1,1326 @@
+openapi: 3.0.3
+info:
+  title: Intranet Docente IES Ramón Arcas Meca
+  description: |
+    API REST de la Intranet de Gestión Docente (Proyecto Intermodular 2º DAW).
+
+    Prefijo funcional `/api/v1`. Autenticación JWT Bearer salvo login/refresh/health.
+
+    Roles: `admin`, `directiva`, `jefatura`, `docente`, `tutor`, `responsable_ticket`.
+    FEM = Formación en Empresas Murcia (no renombrar a FCT).
+  version: 0.1.0
+  contact:
+    name: Proyecto Intermodular DAW — IES Ramón Arcas Meca
+
+servers:
+  - url: http://localhost:8000
+    description: Desarrollo local
+
+tags:
+  - name: Auth
+    description: OAuth Google, JWT, sesión
+  - name: Usuarios
+    description: Claustro, perfil y horarios
+  - name: Anuncios
+    description: Tablón segmentado por departamento
+  - name: Guardias
+    description: Cuadrante y asignación
+  - name: Ausencias
+    description: Registro, justificante, PDF y firma
+  - name: Tickets
+    description: Solicitudes RMI / RRSS / Compras y comentarios
+  - name: FEM
+    description: Formación en Empresas Murcia — alumnado y horas
+  - name: Dashboard
+    description: KPIs para equipo directivo
+  - name: Health
+    description: Liveness y readiness (Docker)
+
+paths:
+  /api/v1/auth/google:
+    post:
+      tags: [Auth]
+      summary: Login con Google OAuth
+      description: |
+        Recibe credenciales OAuth de Google y emite access + refresh token.
+        **PENDIENTE DE DECISIÓN:** forma exacta del credential y restricción de dominio.
+      operationId: authGoogle
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleAuthRequest'
+            example:
+              id_token: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Tokens emitidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renovar access token
+      description: |
+        Usa el refresh token (no el access token).
+        **PENDIENTE DE DECISIÓN:** body JSON vs cookie HttpOnly.
+      operationId: authRefresh
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Nuevo access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesión
+      description: Invalida el refresh token en Redis.
+      operationId: authLogout
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: Sesión invalidada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                code: 200
+                msg: La operacion se ha realizado correctamente
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Usuario autenticado
+      description: Identidad y roles para el arranque de la PWA.
+      operationId: authMe
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario del JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioMe'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listado del claustro
+      operationId: listUsuarios
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: departamento
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filtro por departamento
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+              example:
+                - id: "64f1a2b3c4d5e6f7a8b9c0d1"
+                  name: Jose
+                  departamento: Informatica
+                  roles: [docente]
+                  estado_alta: activo
+                - id: "64f1a2b3c4d5e6f7a8b9c0d2"
+                  name: Juan
+                  departamento: Matematicas
+                  roles: [docente, tutor]
+                  estado_alta: activo
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/usuarios/me:
+    get:
+      tags: [Usuarios]
+      summary: Perfil propio
+      operationId: getUsuariosMe
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Usuario autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioMe'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/usuarios/me/horario:
+    get:
+      tags: [Usuarios]
+      summary: Horario semanal propio
+      operationId: getUsuariosMeHorario
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Horario del docente autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Horario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/usuarios/{id}/horario:
+    get:
+      tags: [Usuarios]
+      summary: Horario semanal de un docente
+      operationId: getUsuarioHorario
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '200':
+          description: Horario del docente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Horario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/usuarios/{id}:
+    patch:
+      tags: [Usuarios]
+      summary: Modificación parcial de usuario
+      description: Ejemplo de uso — aprobar alta pendiente.
+      operationId: patchUsuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioPatch'
+            example:
+              estado_alta: activo
+              departamento: Informatica
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+              example:
+                code: 200
+                msg: La operacion se ha realizado correctamente
+                data:
+                  id: "64f1a2b3c4d5e6f7a8b9c0d1"
+                  estado_alta: activo
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/anuncios:
+    get:
+      tags: [Anuncios]
+      summary: Feed del tablón
+      operationId: listAnuncios
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: departamento
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de anuncios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Anuncio'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Anuncios]
+      summary: Publicar anuncio
+      operationId: createAnuncio
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnuncioCreate'
+      responses:
+        '201':
+          description: Anuncio creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+              example:
+                code: 201
+                msg: La operacion se ha realizado correctamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/anuncios/{id}/fijar:
+    patch:
+      tags: [Anuncios]
+      summary: Fijar o desfijar anuncio
+      operationId: fijarAnuncio
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fijado]
+              properties:
+                fijado:
+                  type: boolean
+      responses:
+        '200':
+          description: Estado de fijado actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/guardias:
+    get:
+      tags: [Guardias]
+      summary: Consultar cuadrante
+      operationId: listGuardias
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: fecha
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          example: "2026-10-02"
+        - name: franja
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Identificador de franja horaria
+      responses:
+        '200':
+          description: Lista de guardias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Guardia'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/guardias/asignar:
+    post:
+      tags: [Guardias]
+      summary: Ejecutar asignación por rondas
+      description: |
+        Acción de negocio. La lógica vive en `services/guardias_service`.
+        **PENDIENTE DE DECISIÓN:** detalle del algoritmo.
+      operationId: asignarGuardias
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuardiaAsignarRequest'
+      responses:
+        '200':
+          description: Asignación ejecutada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/guardias/{id}:
+    patch:
+      tags: [Guardias]
+      summary: Modificar docente que cubre la guardia
+      operationId: patchGuardia
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuardiaPatch'
+      responses:
+        '200':
+          description: Guardia actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/ausencias:
+    post:
+      tags: [Ausencias]
+      summary: Registrar ausencia
+      operationId: createAusencia
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AusenciaCreate'
+            example:
+              tipo: generica
+              fecha_inicio: "2026-10-03"
+              fecha_fin: "2026-10-03"
+              motivo: Visita medica
+      responses:
+        '201':
+          description: Ausencia creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+              example:
+                code: 201
+                msg: La operacion se ha realizado correctamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/ausencias/{id}/justificante:
+    post:
+      tags: [Ausencias]
+      summary: Subir justificante
+      description: Requiere ser dueño de la ausencia (propiedad, no rol).
+      operationId: uploadJustificante
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Justificante asociado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/ausencias/{id}/pdf:
+    get:
+      tags: [Ausencias]
+      summary: Descargar PDF de la ausencia
+      description: Requiere ser dueño de la ausencia.
+      operationId: getAusenciaPdf
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Documento PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/ausencias/{id}/firma:
+    post:
+      tags: [Ausencias]
+      summary: Insertar firma
+      description: |
+        Firma manuscrita/electrónica (AutoFirma u otro mecanismo).
+        **PENDIENTE DE DECISIÓN:** formato exacto del payload de firma.
+      operationId: firmarAusencia
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirmaRequest'
+      responses:
+        '200':
+          description: Firma registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/tickets:
+    get:
+      tags: [Tickets]
+      summary: Listar tickets
+      operationId: listTickets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tipo
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TicketTipo'
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TicketEstado'
+      responses:
+        '200':
+          description: Lista de tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Tickets]
+      summary: Crear ticket
+      operationId: createTicket
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketCreate'
+      responses:
+        '201':
+          description: Ticket creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+              example:
+                code: 201
+                msg: La operacion se ha realizado correctamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/tickets/{id}:
+    patch:
+      tags: [Tickets]
+      summary: Transición de estado del ticket
+      description: |
+        Máquina de estados: `abierto` → `en_proceso` → `resuelto` → `cerrado`.
+        Transiciones inválidas → 422.
+      operationId: patchTicket
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketPatch'
+      responses:
+        '200':
+          description: Ticket actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/tickets/{id}/comentarios:
+    get:
+      tags: [Tickets]
+      summary: Listar comentarios del ticket
+      operationId: listTicketComentarios
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Hilo de comentarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comentario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Tickets]
+      summary: Añadir comentario
+      operationId: createTicketComentario
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComentarioCreate'
+      responses:
+        '201':
+          description: Comentario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/fem/alumnos:
+    get:
+      tags: [FEM]
+      summary: Alumnado FEM asignado
+      description: Formación en Empresas Murcia. No usar `/fct`.
+      operationId: listFemAlumnos
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de alumnos FEM
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FemAlumno'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/fem/alumnos/{id}/horas:
+    patch:
+      tags: [FEM]
+      summary: Actualizar horas cursadas
+      description: Progreso sobre 500 horas de prácticas.
+      operationId: patchFemAlumnoHoras
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FemHorasPatch'
+      responses:
+        '200':
+          description: Horas actualizadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageWithData'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/dashboard/kpis:
+    get:
+      tags: [Dashboard]
+      summary: KPIs del centro
+      operationId: getDashboardKpis
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Métricas consolidadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardKpis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness
+      operationId: healthLive
+      security: []
+      responses:
+        '200':
+          description: Proceso vivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness
+      description: Comprueba disponibilidad de MongoDB y Redis.
+      operationId: healthReady
+      security: []
+      responses:
+        '200':
+          description: Dependencias listas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  mongo:
+                    type: boolean
+                  redis:
+                    type: boolean
+        '503':
+          description: Dependencias no disponibles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UsuarioId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Identificador del usuario (codificado en la URL)
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Identificador del recurso (codificado en la URL)
+
+  responses:
+    BadRequest:
+      description: Petición incorrecta
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 400
+            msg: Peticion incorrecta
+    Unauthorized:
+      description: No autenticado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 401
+            msg: No autenticado
+    Forbidden:
+      description: Sin permisos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 403
+            msg: No autorizado
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 404
+            msg: Recurso no encontrado
+    UnprocessableEntity:
+      description: Validación fallida o transición inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 422
+            msg: Datos no validos
+            details:
+              - field: estado
+                issue: Transicion no permitida
+
+  schemas:
+    Role:
+      type: string
+      enum:
+        - admin
+        - directiva
+        - jefatura
+        - docente
+        - tutor
+        - responsable_ticket
+
+    MessageResponse:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: integer
+          example: 200
+        msg:
+          type: string
+          example: La operacion se ha realizado correctamente
+
+    MessageWithData:
+      allOf:
+        - $ref: '#/components/schemas/MessageResponse'
+        - type: object
+          properties:
+            data:
+              description: Recurso afectado (forma según endpoint)
+
+    ErrorResponse:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: integer
+        msg:
+          type: string
+        details:
+          description: Detalle opcional de validación
+
+    GoogleAuthRequest:
+      type: object
+      required: [id_token]
+      properties:
+        id_token:
+          type: string
+          description: ID token de Google (forma exacta PENDIENTE DE DECISIÓN)
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+
+    TokenPairResponse:
+      type: object
+      required: [access_token, token_type]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          description: Segundos de validez del access token
+
+    Usuario:
+      type: object
+      required: [id, name, departamento, roles]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        departamento:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        estado_alta:
+          type: string
+          enum: [pendiente, activo, baja]
+
+    UsuarioMe:
+      allOf:
+        - $ref: '#/components/schemas/Usuario'
+        - type: object
+          properties:
+            permisos:
+              type: array
+              items:
+                type: string
+              description: Capacidades derivadas (opcional)
+
+    UsuarioPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        departamento:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        estado_alta:
+          type: string
+          enum: [pendiente, activo, baja]
+
+    Horario:
+      type: object
+      properties:
+        usuario_id:
+          type: string
+        semana:
+          type: array
+          items:
+            type: object
+            properties:
+              dia:
+                type: string
+                enum: [L, M, X, J, V]
+              franja:
+                type: string
+              asignatura:
+                type: string
+              grupo:
+                type: string
+              aula:
+                type: string
+
+    Anuncio:
+      type: object
+      required: [id, titulo, cuerpo]
+      properties:
+        id:
+          type: string
+        titulo:
+          type: string
+        cuerpo:
+          type: string
+        departamento:
+          type: string
+          nullable: true
+        fijado:
+          type: boolean
+          default: false
+        expira_en:
+          type: string
+          format: date-time
+          nullable: true
+        creado_en:
+          type: string
+          format: date-time
+
+    AnuncioCreate:
+      type: object
+      required: [titulo, cuerpo]
+      properties:
+        titulo:
+          type: string
+        cuerpo:
+          type: string
+        departamento:
+          type: string
+          nullable: true
+        expira_en:
+          type: string
+          format: date-time
+          nullable: true
+
+    Guardia:
+      type: object
+      required: [id, fecha, franja]
+      properties:
+        id:
+          type: string
+        fecha:
+          type: string
+          format: date
+        franja:
+          type: string
+        ausente_id:
+          type: string
+          nullable: true
+        cubre_id:
+          type: string
+          nullable: true
+        estado:
+          type: string
+          enum: [pendiente, asignada, cubierta]
+
+    GuardiaAsignarRequest:
+      type: object
+      properties:
+        fecha:
+          type: string
+          format: date
+        franja:
+          type: string
+
+    GuardiaPatch:
+      type: object
+      properties:
+        cubre_id:
+          type: string
+        estado:
+          type: string
+          enum: [pendiente, asignada, cubierta]
+
+    AusenciaTipo:
+      type: string
+      enum: [generica, administrativa, extraescolar]
+
+    AusenciaCreate:
+      type: object
+      required: [tipo, fecha_inicio, fecha_fin]
+      properties:
+        tipo:
+          $ref: '#/components/schemas/AusenciaTipo'
+        fecha_inicio:
+          type: string
+          format: date
+        fecha_fin:
+          type: string
+          format: date
+        motivo:
+          type: string
+
+    FirmaRequest:
+      type: object
+      properties:
+        firma_base64:
+          type: string
+          description: Imagen o payload de firma (formato PENDIENTE DE DECISIÓN)
+        proveedor:
+          type: string
+          example: autofirma
+
+    TicketTipo:
+      type: string
+      enum: [rmi, rrss, compras, otro]
+
+    TicketEstado:
+      type: string
+      enum: [abierto, en_proceso, resuelto, cerrado]
+      description: |
+        Transiciones válidas: abierto → en_proceso → resuelto → cerrado.
+
+    Ticket:
+      type: object
+      required: [id, tipo, estado, titulo]
+      properties:
+        id:
+          type: string
+        tipo:
+          $ref: '#/components/schemas/TicketTipo'
+        estado:
+          $ref: '#/components/schemas/TicketEstado'
+        titulo:
+          type: string
+        descripcion:
+          type: string
+        solicitante_id:
+          type: string
+        asignado_id:
+          type: string
+          nullable: true
+        creado_en:
+          type: string
+          format: date-time
+
+    TicketCreate:
+      type: object
+      required: [tipo, titulo]
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TicketTipo'
+        titulo:
+          type: string
+        descripcion:
+          type: string
+
+    TicketPatch:
+      type: object
+      properties:
+        estado:
+          $ref: '#/components/schemas/TicketEstado'
+        asignado_id:
+          type: string
+
+    Comentario:
+      type: object
+      required: [id, autor_id, cuerpo, creado_en]
+      properties:
+        id:
+          type: string
+        autor_id:
+          type: string
+        cuerpo:
+          type: string
+        creado_en:
+          type: string
+          format: date-time
+
+    ComentarioCreate:
+      type: object
+      required: [cuerpo]
+      properties:
+        cuerpo:
+          type: string
+          minLength: 1
+
+    FemAlumno:
+      type: object
+      required: [id, nombre, horas_cursadas, horas_totales]
+      properties:
+        id:
+          type: string
+        nombre:
+          type: string
+        empresa:
+          type: string
+        estado:
+          type: string
+        horas_cursadas:
+          type: number
+          minimum: 0
+        horas_totales:
+          type: number
+          example: 500
+        tutor_id:
+          type: string
+
+    FemHorasPatch:
+      type: object
+      required: [horas_cursadas]
+      properties:
+        horas_cursadas:
+          type: number
+          minimum: 0
+          maximum: 500
+
+    DashboardKpis:
+      type: object
+      properties:
+        ausencias_hoy:
+          type: integer
+        guardias_pendientes:
+          type: integer
+        tickets_abiertos:
+          type: integer
+        docentes_activos:
+          type: integer
+        alumnos_fem_activos:
+          type: integer

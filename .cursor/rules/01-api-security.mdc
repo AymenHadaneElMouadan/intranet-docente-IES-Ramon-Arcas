@@ -1,0 +1,29 @@
+---
+description: Seguridad, JWT y roles de la Intranet Docente
+globs:
+alwaysApply: true
+---
+
+# Seguridad
+
+## Nunca
+
+- Confiar en roles enviados por el frontend.
+- Introducir secretos en el código o en Git.
+- Desactivar autenticación “para facilitar el desarrollo” en código permanente.
+- Aceptar archivos subidos sin validar tamaño, extensión y tipo MIME.
+- Devolver información sensible innecesaria en errores.
+
+## Autenticación
+
+- Endpoints protegidos: JWT Bearer + `Depends()` en FastAPI.
+- Refresh tokens independientes del access token; deben poder invalidarse (Redis).
+- `GET /auth/me` es la fuente de identidad/roles para el arranque de la PWA.
+- Errores 401/403 sin filtrar datos internos.
+
+## Autorización
+
+- Roles oficiales: `admin`, `directiva`, `jefatura`, `docente`, `tutor`, `responsable_ticket`.
+- Matriz: `docs/roles-and-permissions.md`.
+- Propiedad (dueño de ausencia, asignado a ticket) no es un rol; comprobarla en servicio.
+- Transiciones de tickets: solo estados válidos (`abierto` → `en_proceso` → `resuelto` → `cerrado`).
