@@ -42,8 +42,9 @@ paths:
       tags: [Auth]
       summary: Login con Google OAuth
       description: |
-        Recibe credenciales OAuth de Google y emite access + refresh token.
-        **PENDIENTE DE DECISIÓN:** forma exacta del credential y restricción de dominio.
+        Recibe `id_token` de Google Identity Services.
+        Emite access JWT en el body y refresh en cookie HttpOnly `refresh_token`.
+        Sin restriccion de dominio; usuarios nuevos quedan en estado `pendiente`.
       operationId: authGoogle
       security: []
       requestBody:
@@ -56,11 +57,16 @@ paths:
               id_token: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
       responses:
         '200':
-          description: Tokens emitidos
+          description: Access token emitido (refresh en Set-Cookie)
+          headers:
+            Set-Cookie:
+              description: Cookie HttpOnly refresh_token
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPairResponse'
+                $ref: '#/components/schemas/AccessTokenResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -73,52 +79,43 @@ paths:
       tags: [Auth]
       summary: Renovar access token
       description: |
-        Usa el refresh token (no el access token).
-        **PENDIENTE DE DECISIÓN:** body JSON vs cookie HttpOnly.
+        Lee la cookie HttpOnly `refresh_token` (no usa Bearer).
+        Valida el token opaco en Redis y emite un nuevo access JWT.
       operationId: authRefresh
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshRequest'
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Nuevo access token
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPairResponse'
+                $ref: '#/components/schemas/AccessTokenResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
 
   /api/v1/auth/logout:
     post:
       tags: [Auth]
       summary: Cerrar sesión
-      description: Invalida el refresh token en Redis.
+      description: Invalida el refresh en Redis y borra la cookie.
       operationId: authLogout
       security:
         - BearerAuth: []
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LogoutRequest'
       responses:
         '200':
           description: Sesión invalidada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/DetailMessage'
               example:
-                code: 200
-                msg: La operacion se ha realizado correctamente
+                detail: Sesion cerrada
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -144,6 +141,7 @@ paths:
     get:
       tags: [Usuarios]
       summary: Listado del claustro
+      description: Requiere rol admin. Admite filtro y paginacion.
       operationId: listUsuarios
       security:
         - BearerAuth: []
@@ -153,31 +151,61 @@ paths:
           required: false
           schema:
             type: string
-          description: Filtro por departamento
+          description: Filtra por departamento
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
       responses:
         '200':
-          description: Lista de usuarios
+          description: Pagina de usuarios
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Usuario'
-              example:
-                - id: "64f1a2b3c4d5e6f7a8b9c0d1"
-                  name: Jose
-                  departamento: Informatica
-                  roles: [docente]
-                  estado_alta: activo
-                - id: "64f1a2b3c4d5e6f7a8b9c0d2"
-                  name: Juan
-                  departamento: Matematicas
-                  roles: [docente, tutor]
-                  estado_alta: activo
+                $ref: '#/components/schemas/UsuarioPaginated'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      tags: [Usuarios]
+      summary: Alta manual de usuario
+      description: El servidor asigna el id. Cabecera Location apunta al GET por id.
+      operationId: createUsuario
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioCreate'
+            example:
+              name: Pepa
+              email: pepa@example.com
+              departamento: FOL
+              roles: [docente]
+      responses:
+        '201':
+          description: Usuario creado
+          headers:
+            Location:
+              description: URL del recurso creado
+              schema:
+                type: string
+                example: /api/v1/usuarios/64f1a2b3c4d5e6f7a8b9c0d3
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /api/v1/usuarios/me:
     get:
@@ -239,10 +267,31 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /api/v1/usuarios/{id}:
+    get:
+      tags: [Usuarios]
+      summary: Obtener un usuario
+      operationId: getUsuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '200':
+          description: Usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
       tags: [Usuarios]
-      summary: Modificación parcial de usuario
-      description: Ejemplo de uso — aprobar alta pendiente.
+      summary: Modificacion parcial de usuario
+      description: Ejemplo de uso — aprobar alta pendiente (`estado: activo`).
       operationId: patchUsuario
       security:
         - BearerAuth: []
@@ -255,7 +304,7 @@ paths:
             schema:
               $ref: '#/components/schemas/UsuarioPatch'
             example:
-              estado_alta: activo
+              estado: activo
               departamento: Informatica
       responses:
         '200':
@@ -263,13 +312,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
-              example:
-                code: 200
-                msg: La operacion se ha realizado correctamente
-                data:
-                  id: "64f1a2b3c4d5e6f7a8b9c0d1"
-                  estado_alta: activo
+                $ref: '#/components/schemas/Usuario'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -320,13 +363,14 @@ paths:
       responses:
         '201':
           description: Anuncio creado
+          headers:
+            Location:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
-              example:
-                code: 201
-                msg: La operacion se ha realizado correctamente
+                $ref: '#/components/schemas/Anuncio'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -361,7 +405,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/DetailMessage'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -410,7 +454,7 @@ paths:
       summary: Ejecutar asignación por rondas
       description: |
         Acción de negocio. La lógica vive en `services/guardias_service`.
-        **PENDIENTE DE DECISIÓN:** detalle del algoritmo.
+        Detalle del algoritmo: pendiente de implementacion (Fase 3).
       operationId: asignarGuardias
       security:
         - BearerAuth: []
@@ -426,7 +470,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -455,7 +499,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -491,7 +535,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
               example:
                 code: 201
                 msg: La operacion se ha realizado correctamente
@@ -529,7 +573,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/DetailMessage'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -590,7 +634,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/DetailMessage'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -649,7 +693,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
               example:
                 code: 201
                 msg: La operacion se ha realizado correctamente
@@ -684,7 +728,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -740,7 +784,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -802,7 +846,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -878,7 +922,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ErrorDetail'
 
 components:
   securitySchemes:
@@ -902,56 +946,71 @@ components:
       schema:
         type: string
       description: Identificador del recurso (codificado en la URL)
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
 
   responses:
     BadRequest:
-      description: Petición incorrecta
+      description: Peticion incorrecta
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 400
-            msg: Peticion incorrecta
+            detail: Peticion incorrecta
     Unauthorized:
       description: No autenticado
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 401
-            msg: No autenticado
+            detail: No autenticado
     Forbidden:
       description: Sin permisos
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 403
-            msg: No autorizado
+            detail: Se requiere uno de estos roles: admin
     NotFound:
       description: Recurso no encontrado
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 404
-            msg: Recurso no encontrado
-    UnprocessableEntity:
-      description: Validación fallida o transición inválida
+            detail: Recurso no encontrado
+    Conflict:
+      description: Conflicto (duplicado, solapamiento o transicion no valida)
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 422
-            msg: Datos no validos
-            details:
-              - field: estado
-                issue: Transicion no permitida
+            detail: El recurso ya existe
+    UnprocessableEntity:
+      description: Validacion fallida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorDetail'
 
   schemas:
     Role:
@@ -964,35 +1023,24 @@ components:
         - tutor
         - responsable_ticket
 
-    MessageResponse:
+    ErrorDetail:
       type: object
-      required: [code, msg]
+      required: [detail]
       properties:
-        code:
-          type: integer
-          example: 200
-        msg:
-          type: string
-          example: La operacion se ha realizado correctamente
+        detail:
+          description: Mensaje o lista de errores de validacion (estilo FastAPI)
 
-    MessageWithData:
-      allOf:
-        - $ref: '#/components/schemas/MessageResponse'
-        - type: object
-          properties:
-            data:
-              description: Recurso afectado (forma según endpoint)
-
-    ErrorResponse:
+    DetailMessage:
       type: object
-      required: [code, msg]
+      required: [detail]
       properties:
-        code:
-          type: integer
-        msg:
+        detail:
           type: string
-        details:
-          description: Detalle opcional de validación
+
+    ResourceAck:
+      type: object
+      description: Respuesta generica de accion de negocio (modulos pendientes)
+      additionalProperties: true
 
     GoogleAuthRequest:
       type: object
@@ -1000,28 +1048,13 @@ components:
       properties:
         id_token:
           type: string
-          description: ID token de Google (forma exacta PENDIENTE DE DECISIÓN)
+          description: ID token JWT emitido por Google Identity Services
 
-    RefreshRequest:
+    AccessTokenResponse:
       type: object
-      required: [refresh_token]
-      properties:
-        refresh_token:
-          type: string
-
-    LogoutRequest:
-      type: object
-      properties:
-        refresh_token:
-          type: string
-
-    TokenPairResponse:
-      type: object
-      required: [access_token, token_type]
+      required: [access_token, token_type, expires_in]
       properties:
         access_token:
-          type: string
-        refresh_token:
           type: string
         token_type:
           type: string
@@ -1030,9 +1063,13 @@ components:
           type: integer
           description: Segundos de validez del access token
 
+    UsuarioEstado:
+      type: string
+      enum: [pendiente, activo, inactivo]
+
     Usuario:
       type: object
-      required: [id, name, departamento, roles]
+      required: [id, name, email, departamento, roles, estado]
       properties:
         id:
           type: string
@@ -1047,9 +1084,43 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Role'
-        estado_alta:
+        estado:
+          $ref: '#/components/schemas/UsuarioEstado'
+
+    UsuarioPaginated:
+      type: object
+      required: [items, page, limit, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Usuario'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+
+    UsuarioCreate:
+      type: object
+      required: [name, email, departamento]
+      properties:
+        name:
           type: string
-          enum: [pendiente, activo, baja]
+        email:
+          type: string
+          format: email
+        departamento:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+          default: [docente]
+        estado:
+          $ref: '#/components/schemas/UsuarioEstado'
+          default: activo
 
     UsuarioMe:
       allOf:
@@ -1060,7 +1131,6 @@ components:
               type: array
               items:
                 type: string
-              description: Capacidades derivadas (opcional)
 
     UsuarioPatch:
       type: object
@@ -1073,31 +1143,42 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Role'
-        estado_alta:
+        estado:
+          $ref: '#/components/schemas/UsuarioEstado'
+
+    BloqueHorario:
+      type: object
+      required: [inicio, fin, tipo]
+      properties:
+        inicio:
           type: string
-          enum: [pendiente, activo, baja]
+          example: "08:00"
+        fin:
+          type: string
+          example: "09:00"
+        tipo:
+          type: string
+          enum: [clase, guardia, reduccion]
+        asignatura:
+          type: string
+        grupo:
+          type: string
+        aula:
+          type: string
 
     Horario:
       type: object
+      required: [usuario_id, dias]
       properties:
         usuario_id:
           type: string
-        semana:
-          type: array
-          items:
-            type: object
-            properties:
-              dia:
-                type: string
-                enum: [L, M, X, J, V]
-              franja:
-                type: string
-              asignatura:
-                type: string
-              grupo:
-                type: string
-              aula:
-                type: string
+        dias:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/BloqueHorario'
+          description: Mapa dia -> bloques (lunes, martes, ...)
 
     Anuncio:
       type: object

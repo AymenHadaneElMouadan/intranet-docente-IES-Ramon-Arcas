@@ -1,5 +1,4 @@
 # Stub de orquestación local — Intranet Docente
-# La imagen del backend aún no está implementada; servicios de datos listos para el siguiente paso.
 
 services:
   mongo:
@@ -14,14 +13,21 @@ services:
     ports:
       - "6379:6379"
 
-  # backend:
-  #   build: ./backend
-  #   ports:
-  #     - "8000:8000"
-  #   env_file: ./backend/.env
-  #   depends_on:
-  #     - mongo
-  #     - redis
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - mongo
+      - redis
+    volumes:
+      # Montaje en desarrollo: cambios de código sin rebuild (opcional)
+      - ./backend/app:/app/app
 
 volumes:
   mongo_data:

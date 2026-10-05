@@ -1,0 +1,99 @@
+:root {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  line-height: 1.5;
+  color: #1a1a1a;
+  background: linear-gradient(160deg, #e8eef5 0%, #f7f5f0 45%, #eef2e8 100%);
+  min-height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+}
+
+.app-header p {
+  margin: 0.25rem 0 1.5rem;
+  color: #4a5568;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #d8dee6;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profile {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.35rem 0.75rem;
+}
+
+.profile dt {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.profile dd {
+  margin: 0;
+}
+
+.dia h3 {
+  margin: 0.75rem 0 0.25rem;
+  text-transform: capitalize;
+  font-size: 1rem;
+}
+
+.dia ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.hint,
+.muted {
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.error {
+  color: #b42318;
+}
+
+button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #f8fafc;
+}
+
+code {
+  font-size: 0.9em;
+}
