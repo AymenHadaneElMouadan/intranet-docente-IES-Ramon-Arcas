@@ -15,7 +15,7 @@ from app.core.security import (
     new_refresh_token_value,
     set_refresh_cookie,
 )
-from app.models.usuario import AccessTokenResponse, UsuarioPublic, doc_to_usuario
+from app.models.usuario import AccessTokenResponse, UsuarioEstado, UsuarioPublic, doc_to_usuario
 from app.services import usuario_service
 
 REFRESH_PREFIX = "refresh:"
@@ -72,6 +72,12 @@ async def login_with_google(
     name = claims.get("name") or (email.split("@")[0] if email else "Usuario")
     if not email or not google_sub:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token de Google incompleto")
+    # Evita vincular cuentas con email no verificado en Google.
+    if claims.get("email_verified") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El email de Google no está verificado",
+        )
 
     doc = await usuario_service.get_by_google_sub(db, google_sub)
     if doc is None:
@@ -119,7 +125,13 @@ async def refresh_access(
         await revoke_refresh(redis, refresh_token)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
 
+    # Cuentas inactivas no pueden renovar sesión.
+    if user.estado == UsuarioEstado.inactivo:
+        await revoke_refresh(redis, refresh_token)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+
     # Rotación sencilla: invalida el refresh anterior y emite uno nuevo.
+    # pendiente y activo sí pueden refrescar (pendiente necesita /auth/me).
     await revoke_refresh(redis, refresh_token)
     return await issue_tokens(redis, response, user)
 

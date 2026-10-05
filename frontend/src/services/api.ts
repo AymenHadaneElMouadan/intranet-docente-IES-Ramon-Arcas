@@ -1,20 +1,20 @@
 /**
  * Cliente HTTP hacia la API.
- * - Access JWT en Authorization Bearer (memoria del navegador).
+ * - Access JWT en memoria del módulo (no localStorage; reduce riesgo XSS).
  * - Refresh en cookie HttpOnly (credentials: 'include').
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
-const ACCESS_KEY = 'intranet_access_token'
+/** Access token solo en RAM; se pierde al recargar y se recupera con refresh. */
+let accessToken: string | null = null
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_KEY)
+  return accessToken
 }
 
 export function setAccessToken(token: string | null): void {
-  if (token) localStorage.setItem(ACCESS_KEY, token)
-  else localStorage.removeItem(ACCESS_KEY)
+  accessToken = token
 }
 
 type ApiOptions = RequestInit & { skipAuth?: boolean }
@@ -32,6 +32,15 @@ async function tryRefresh(): Promise<boolean> {
   const data = (await res.json()) as { access_token: string }
   setAccessToken(data.access_token)
   return true
+}
+
+/**
+ * Arranque de sesión tras F5: intenta recuperar access vía cookie refresh.
+ * Devuelve true si hay access listo en memoria.
+ */
+export async function bootstrapSession(): Promise<boolean> {
+  if (getAccessToken()) return true
+  return tryRefresh()
 }
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {

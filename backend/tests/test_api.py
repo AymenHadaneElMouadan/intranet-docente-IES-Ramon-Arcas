@@ -14,6 +14,7 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
 os.environ.setdefault("JWT_SECRET", "test-secret-at-least-32-characters!!")
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id")
 os.environ.setdefault("COOKIE_SECURE", "false")
+os.environ.setdefault("ENVIRONMENT", "development")
 
 from app.core.config import get_settings
 
@@ -21,7 +22,19 @@ get_settings.cache_clear()
 
 from app.core.database import get_db, get_redis
 from app.main import app
-from app.services import auth_service
+from app.models.usuario import Role, UsuarioEstado, UsuarioPatch
+from app.services import auth_service, usuario_service
+
+
+def _google_claims(**overrides: object) -> dict:
+    base = {
+        "email": "docente@example.com",
+        "sub": "google-sub-1",
+        "name": "Docente Demo",
+        "email_verified": True,
+    }
+    base.update(overrides)
+    return base
 
 
 @pytest_asyncio.fixture
@@ -61,17 +74,24 @@ async def test_auth_me_unauthorized(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_google_rejects_unverified_email(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        auth_service,
+        "verify_google_id_token",
+        lambda _t: _google_claims(email_verified=False),
+    )
+    res = await client.post("/api/v1/auth/google", json={"id_token": "fake"})
+    assert res.status_code == 401
+    assert "verificado" in res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
 async def test_google_login_refresh_logout(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Flujo completo con Google mockeado (sin llamada real a Google)."""
 
-    def fake_verify(_token: str) -> dict:
-        return {
-            "email": "docente@example.com",
-            "sub": "google-sub-1",
-            "name": "Docente Demo",
-        }
-
-    monkeypatch.setattr(auth_service, "verify_google_id_token", fake_verify)
+    monkeypatch.setattr(auth_service, "verify_google_id_token", lambda _t: _google_claims())
 
     login = await client.post("/api/v1/auth/google", json={"id_token": "fake"})
     assert login.status_code == 200
@@ -82,6 +102,13 @@ async def test_google_login_refresh_logout(client: AsyncClient, monkeypatch: pyt
     assert me.status_code == 200
     assert me.json()["email"] == "docente@example.com"
     assert me.json()["estado"] == "pendiente"
+
+    # Pendiente: puede /auth/me pero no endpoints de negocio.
+    horario = await client.get(
+        "/api/v1/usuarios/me/horario",
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    assert horario.status_code == 403
 
     refresh = await client.post("/api/v1/auth/refresh")
     assert refresh.status_code == 200
@@ -99,31 +126,27 @@ async def test_google_login_refresh_logout(client: AsyncClient, monkeypatch: pyt
 
 @pytest.mark.asyncio
 async def test_usuarios_admin_flow(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_verify(_token: str) -> dict:
-        return {"email": "admin@example.com", "sub": "google-admin", "name": "Admin"}
-
-    monkeypatch.setattr(auth_service, "verify_google_id_token", fake_verify)
+    monkeypatch.setattr(
+        auth_service,
+        "verify_google_id_token",
+        lambda _t: _google_claims(email="admin@example.com", sub="google-admin", name="Admin"),
+    )
 
     login = await client.post("/api/v1/auth/google", json={"id_token": "fake-admin"})
     access = login.json()["access_token"]
     me = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"})
     admin_id = me.json()["id"]
 
-    # Sin rol admin → 403 al listar
+    # Pendiente → 403 (cuenta no activa), aunque tuviera roles.
     listed = await client.get("/api/v1/usuarios", headers={"Authorization": f"Bearer {access}"})
     assert listed.status_code == 403
-
-    # Promueve a admin
-    from app.models.usuario import UsuarioEstado, UsuarioPatch
-    from app.services import usuario_service
 
     await usuario_service.patch_usuario(
         get_db(),
         admin_id,
-        UsuarioPatch(roles=["admin", "docente"], estado=UsuarioEstado.activo),
+        UsuarioPatch(roles=[Role.admin, Role.docente], estado=UsuarioEstado.activo),
     )
 
-    # Re-login para claims actualizados en JWT
     login2 = await client.post("/api/v1/auth/google", json={"id_token": "fake-admin"})
     access2 = login2.json()["access_token"]
 
@@ -140,6 +163,19 @@ async def test_usuarios_admin_flow(client: AsyncClient, monkeypatch: pytest.Monk
     assert created.status_code == 201
     assert created.headers.get("location", "").startswith("/api/v1/usuarios/")
     assert created.json()["name"] == "Pepa"
+
+    # Rol inválido → 422
+    bad_role = await client.post(
+        "/api/v1/usuarios",
+        headers={"Authorization": f"Bearer {access2}"},
+        json={
+            "name": "X",
+            "email": "x@example.com",
+            "departamento": "FOL",
+            "roles": ["superadmin"],
+        },
+    )
+    assert bad_role.status_code == 422
 
     page = await client.get(
         "/api/v1/usuarios?page=1&limit=10",

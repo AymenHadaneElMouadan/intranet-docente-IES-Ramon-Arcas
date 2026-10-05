@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 
 from app.core.database import get_db
-from app.core.deps import CurrentUser, require_roles
+from app.core.deps import CurrentActiveUser, require_roles
 from app.models.usuario import (
     Horario,
     PaginatedUsuarios,
@@ -25,7 +25,7 @@ async def list_usuarios(
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> PaginatedUsuarios:
-    """Listado paginado; solo admin."""
+    """Listado paginado; solo admin activo."""
     return await usuario_service.list_usuarios(
         get_db(), departamento=departamento, page=page, limit=limit
     )
@@ -44,20 +44,20 @@ async def create_usuario(
 
 
 @router.get("/me", response_model=UsuarioPublic)
-async def get_me(current: CurrentUser) -> UsuarioPublic:
-    """Perfil del usuario autenticado."""
+async def get_me(current: CurrentActiveUser) -> UsuarioPublic:
+    """Perfil del usuario autenticado (cuenta activa)."""
     return current
 
 
 @router.get("/me/horario", response_model=Horario)
-async def get_me_horario(current: CurrentUser) -> Horario:
-    """Horario semanal propio (arranque PWA)."""
+async def get_me_horario(current: CurrentActiveUser) -> Horario:
+    """Horario semanal propio (arranque PWA); requiere cuenta activa."""
     return await usuario_service.get_horario(get_db(), current.id)
 
 
 @router.get("/{id}", response_model=UsuarioPublic)
 async def get_usuario(
-    current: CurrentUser,
+    current: CurrentActiveUser,
     id: Annotated[str, Path(description="Identificador del usuario")],
 ) -> UsuarioPublic:
     """Detalle: admin o el propio usuario."""
@@ -71,7 +71,7 @@ async def get_usuario(
 
 @router.get("/{id}/horario", response_model=Horario)
 async def get_usuario_horario(
-    current: CurrentUser,
+    current: CurrentActiveUser,
     id: Annotated[str, Path()],
 ) -> Horario:
     """Horario de un docente: admin o self."""

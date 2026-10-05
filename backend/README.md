@@ -26,6 +26,13 @@ docker compose up --build
 
 API en `http://localhost:8000` — documentación interactiva en `/docs`.
 
+## Seguridad de sesión (resumen)
+
+- Access JWT: header Bearer; en el frontend solo en memoria (se recupera con cookie refresh).
+- Refresh: cookie HttpOnly; Redis.
+- Cuentas `pendiente`: pueden `/auth/me` y logout; no endpoints de negocio hasta `activo`.
+- Fuera de development: `JWT_SECRET` obligatorio y ≥32 caracteres (falla al arrancar si no).
+
 ## Capas
 
 ```

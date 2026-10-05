@@ -76,11 +76,12 @@ async def create_from_google(
 
 async def create_manual(db: AsyncIOMotorDatabase, payload: UsuarioCreate) -> UsuarioPublic:
     """Alta manual por administración (sin OAuth)."""
+    role_values = [r.value for r in payload.roles] if payload.roles else ["docente"]
     doc = {
         "email": str(payload.email).lower(),
         "name": payload.name,
         "departamento": payload.departamento,
-        "roles": payload.roles or ["docente"],
+        "roles": role_values,
         "estado": payload.estado.value,
         "google_sub": None,
         "horario": DEFAULT_HORARIO_DIAS,
@@ -117,6 +118,10 @@ async def patch_usuario(db: AsyncIOMotorDatabase, user_id: str, payload: Usuario
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
     if "estado" in updates and updates["estado"] is not None:
         updates["estado"] = updates["estado"].value if hasattr(updates["estado"], "value") else updates["estado"]
+    if "roles" in updates and updates["roles"] is not None:
+        updates["roles"] = [
+            r.value if hasattr(r, "value") else r for r in updates["roles"]
+        ]
     if not updates:
         user = await get_by_id(db, user_id)
         if user is None:

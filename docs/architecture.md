@@ -64,7 +64,10 @@ POST /api/v1/auth/logout   → invalidación del refresh (Redis) + borra cookie
 - Endpoints protegidos: header `Authorization: Bearer <access_token>`.
 - El backend valida siempre identidad y roles; no confiar en datos de autorización del frontend.
 - Refresh: cookie HttpOnly `refresh_token`; valor opaco guardado en Redis.
-- OAuth Google sin restricción de dominio; usuarios nuevos quedan en estado `pendiente` hasta aprobación admin.
+- Access JWT en el frontend: solo en memoria (no `localStorage`); tras recargar se recupera con `/auth/refresh`.
+- `GET /auth/me` y logout admiten usuario `pendiente`; el resto de negocio exige `estado == activo`.
+- OAuth Google sin restricción de dominio; exige `email_verified`; usuarios nuevos quedan en `pendiente` hasta aprobación admin.
+- Fuera de `ENVIRONMENT=development`, `JWT_SECRET` debe ser fuerte (≥32 caracteres, no el default inseguro).
 
 ## Frontend
 

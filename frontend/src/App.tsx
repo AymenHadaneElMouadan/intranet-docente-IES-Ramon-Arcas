@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { GoogleLoginButton } from './components/GoogleLoginButton'
 import {
+  bootstrapSession,
   fetchMe,
   fetchMiHorario,
-  getAccessToken,
   logout,
   type Horario,
   type UsuarioMe,
@@ -16,21 +16,28 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  /** Carga auth/me + horario propio (arranque PWA). */
+  /**
+   * Arranque: refresh por cookie → auth/me.
+   * Horario solo si la cuenta está activa (pendiente no puede llamar a /usuarios/me/horario).
+   */
   const loadSession = useCallback(async () => {
-    if (!getAccessToken()) {
-      setUser(null)
-      setHorario(null)
-      setLoading(false)
-      return
-    }
     setLoading(true)
     setError(null)
     try {
+      const ok = await bootstrapSession()
+      if (!ok) {
+        setUser(null)
+        setHorario(null)
+        return
+      }
       const me = await fetchMe()
-      const h = await fetchMiHorario()
       setUser(me)
-      setHorario(h)
+      if (me.estado === 'activo') {
+        const h = await fetchMiHorario()
+        setHorario(h)
+      } else {
+        setHorario(null)
+      }
     } catch (err) {
       setUser(null)
       setHorario(null)
@@ -97,25 +104,27 @@ function App() {
               )}
             </section>
 
-            <section className="card">
-              <h2>Mi horario</h2>
-              {!horario && <p>Sin horario.</p>}
-              {horario &&
-                Object.entries(horario.dias).map(([dia, bloques]) => (
-                  <div key={dia} className="dia">
-                    <h3>{dia}</h3>
-                    {bloques.length === 0 && <p className="muted">Sin bloques</p>}
-                    <ul>
-                      {bloques.map((b, i) => (
-                        <li key={`${dia}-${i}`}>
-                          {b.inicio}–{b.fin} · {b.tipo}
-                          {b.asignatura ? ` · ${b.asignatura}` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-            </section>
+            {user.estado === 'activo' && (
+              <section className="card">
+                <h2>Mi horario</h2>
+                {!horario && <p>Sin horario.</p>}
+                {horario &&
+                  Object.entries(horario.dias).map(([dia, bloques]) => (
+                    <div key={dia} className="dia">
+                      <h3>{dia}</h3>
+                      {bloques.length === 0 && <p className="muted">Sin bloques</p>}
+                      <ul>
+                        {bloques.map((b, i) => (
+                          <li key={`${dia}-${i}`}>
+                            {b.inicio}–{b.fin} · {b.tipo}
+                            {b.asignatura ? ` · ${b.asignatura}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+              </section>
+            )}
           </>
         )}
       </main>

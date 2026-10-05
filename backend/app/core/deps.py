@@ -8,7 +8,7 @@ from jwt import PyJWTError
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.models.usuario import UsuarioPublic
+from app.models.usuario import UsuarioEstado, UsuarioPublic
 from app.services import usuario_service
 
 # Extrae el Bearer del header Authorization; no falla solo si falta (auto_error=False).
@@ -18,7 +18,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> UsuarioPublic:
-    """Resuelve el usuario autenticado a partir del access JWT."""
+    """Resuelve el usuario autenticado (cualquier estado, incl. pendiente)."""
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
 
@@ -37,13 +37,27 @@ async def get_current_user(
     return user
 
 
+async def get_current_active_user(
+    current_user: Annotated[UsuarioPublic, Depends(get_current_user)],
+) -> UsuarioPublic:
+    """Exige usuario con estado activo (negocio de la intranet)."""
+    if current_user.estado != UsuarioEstado.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere una cuenta activa",
+        )
+    return current_user
+
+
 def require_roles(*roles: str) -> Callable:
     """
-    Factory de Depends: exige que el usuario tenga al menos uno de los roles.
+    Factory de Depends: exige cuenta activa y al menos uno de los roles.
     Uso: current_user: UsuarioPublic = Depends(require_roles("admin"))
     """
 
-    async def _checker(current_user: Annotated[UsuarioPublic, Depends(get_current_user)]) -> UsuarioPublic:
+    async def _checker(
+        current_user: Annotated[UsuarioPublic, Depends(get_current_active_user)],
+    ) -> UsuarioPublic:
         if not set(roles).intersection(current_user.roles):
             needed = ", ".join(roles)
             raise HTTPException(
@@ -56,3 +70,4 @@ def require_roles(*roles: str) -> Callable:
 
 
 CurrentUser = Annotated[UsuarioPublic, Depends(get_current_user)]
+CurrentActiveUser = Annotated[UsuarioPublic, Depends(get_current_active_user)]

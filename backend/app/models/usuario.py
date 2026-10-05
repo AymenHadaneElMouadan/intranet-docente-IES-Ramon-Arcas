@@ -50,14 +50,14 @@ class UsuarioCreate(BaseModel):
     name: str
     email: EmailStr
     departamento: str
-    roles: list[str] = Field(default_factory=lambda: [Role.docente.value])
+    roles: list[Role] = Field(default_factory=lambda: [Role.docente])
     estado: UsuarioEstado = UsuarioEstado.activo
 
 
 class UsuarioPatch(BaseModel):
     name: str | None = None
     departamento: str | None = None
-    roles: list[str] | None = None
+    roles: list[Role] | None = None
     estado: UsuarioEstado | None = None
 
 
