@@ -40,7 +40,13 @@ def _oid(user_id: str) -> ObjectId:
 
 
 async def get_by_id(db: AsyncIOMotorDatabase, user_id: str) -> UsuarioPublic | None:
-    doc = await db[COLLECTION].find_one({"_id": _oid(user_id)})
+    """
+    Busca por id. Devuelve None si el id es inválido o no existe
+    (así auth puede mapear JWT.sub malo a 401, no a 404).
+    """
+    if not ObjectId.is_valid(user_id):
+        return None
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(user_id)})
     return doc_to_usuario(doc) if doc else None
 
 

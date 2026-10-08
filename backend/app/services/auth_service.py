@@ -65,7 +65,10 @@ async def login_with_google(
     response: Response,
     id_token_value: str,
 ) -> AccessTokenResponse:
-    """Valida Google, crea/recupera usuario y emite access + cookie refresh."""
+    """
+    Login OAuth: verifica id_token → alta o vínculo por email/sub → access JWT + cookie refresh.
+    Altas nuevas quedan en estado pendiente hasta aprobación admin.
+    """
     claims = verify_google_id_token(id_token_value)
     email = claims.get("email")
     google_sub = claims.get("sub")

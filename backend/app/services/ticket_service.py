@@ -84,10 +84,12 @@ async def patch_ticket(
     ticket_id: str,
     payload: TicketPatch,
 ) -> Ticket:
+    """Aplica patch; la autorización (quién puede) la comprueba el router."""
     current = await get_ticket(db, ticket_id)
     updates: dict[str, Any] = {}
 
     if payload.estado is not None:
+        # Máquina: abierto → en_proceso → resuelto → cerrado (sin saltos).
         permitidos = TRANSICIONES_VALIDAS[current.estado]
         if payload.estado not in permitidos:
             raise HTTPException(
@@ -141,7 +143,7 @@ async def create_comentario(
 
 
 def puede_gestionar_ticket(user_roles: list[str], ticket: Ticket, user_id: str) -> bool:
-    """admin o responsable_ticket asignado (o sin asignar aún para responsable)."""
+    """Transiciones/asignación: admin siempre; responsable_ticket si es el asignado (o aún libre)."""
     if "admin" in user_roles:
         return True
     if "responsable_ticket" in user_roles:
@@ -150,6 +152,7 @@ def puede_gestionar_ticket(user_roles: list[str], ticket: Ticket, user_id: str) 
 
 
 def puede_comentar(user_roles: list[str], ticket: Ticket, user_id: str) -> bool:
+    """Comentar: admin/responsable_ticket, o dueño (solicitante) / asignado."""
     if "admin" in user_roles or "responsable_ticket" in user_roles:
         return True
     return ticket.solicitante_id == user_id or ticket.asignado_id == user_id

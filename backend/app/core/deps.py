@@ -18,7 +18,10 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> UsuarioPublic:
-    """Resuelve el usuario autenticado (cualquier estado, incl. pendiente)."""
+    """
+    Identidad de sesión: JWT Bearer válido + usuario aún en Mongo.
+    Admite estado pendiente (p.ej. GET /auth/me); el negocio usa get_current_active_user.
+    """
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
 
@@ -31,6 +34,7 @@ async def get_current_user(
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
 
+    # Roles del JWT no se confían: la fuente de verdad es Mongo.
     user = await usuario_service.get_by_id(get_db(), user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
@@ -40,7 +44,7 @@ async def get_current_user(
 async def get_current_active_user(
     current_user: Annotated[UsuarioPublic, Depends(get_current_user)],
 ) -> UsuarioPublic:
-    """Exige usuario con estado activo (negocio de la intranet)."""
+    """Cuenta activa: alta OAuth pendiente no puede usar endpoints de negocio."""
     if current_user.estado != UsuarioEstado.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -51,8 +55,8 @@ async def get_current_active_user(
 
 def require_roles(*roles: str) -> Callable:
     """
-    Factory de Depends: exige cuenta activa y al menos uno de los roles.
-    Uso: current_user: UsuarioPublic = Depends(require_roles("admin"))
+    Factory: cuenta activa + al menos uno de los roles pedidos.
+    Uso: Depends(require_roles("admin", "jefatura"))
     """
 
     async def _checker(
