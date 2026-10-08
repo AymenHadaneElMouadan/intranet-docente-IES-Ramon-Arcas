@@ -42,13 +42,16 @@ Identificadores: `string` (ObjectId de MongoDB en hex). El cliente **nunca** env
 
 | Método | Endpoint | Auth | Roles / regla | Descripción |
 |--------|----------|------|---------------|-------------|
-| GET | `/api/v1/usuarios` | Auth | `admin` | Listado paginado (`?departamento=&page=&limit=`) |
+| GET | `/api/v1/usuarios` | Auth | `admin` | Listado paginado (`?departamento=&estado=&rol=&page=&limit=`) |
 | POST | `/api/v1/usuarios` | Auth | `admin` | Alta manual; `201` + `Location` |
 | GET | `/api/v1/usuarios/me` | Auth | — | Perfil propio |
+| PATCH | `/api/v1/usuarios/me` | Auth | — | Rectificar datos propios (RGPD) |
+| GET | `/api/v1/usuarios/me/datos` | Auth | — | Exportar datos personales propios (RGPD) |
 | GET | `/api/v1/usuarios/me/horario` | Auth | — | Horario semanal propio |
 | GET | `/api/v1/usuarios/{id}` | Auth | `admin` o propio | Detalle |
 | GET | `/api/v1/usuarios/{id}/horario` | Auth | `admin` o propio | Horario de un docente |
 | PATCH | `/api/v1/usuarios/{id}` | Auth | `admin` | Parcial (aprobar, roles, departamento…) |
+| PUT | `/api/v1/usuarios/{id}/roles` | Auth | `admin` | Sustituir lista de roles; `409` si se elimina el último admin |
 
 ## Anuncios
 
@@ -107,6 +110,31 @@ abierto → en_proceso → resuelto → cerrado
 |--------|----------|------|-------|-------------|
 | GET | `/api/v1/dashboard/kpis` | Auth | `directiva`, `admin` | Indicadores del centro |
 
+## Retrasos
+
+| Método | Endpoint | Auth | Roles | Descripción |
+|--------|----------|------|-------|-------------|
+| POST | `/api/v1/retrasos` | Auth | `docente`, `admin` | Registrar retraso; `201` + `Location` |
+| GET | `/api/v1/retrasos/{id}` | Auth | `docente`, `admin` | Detalle |
+| GET | `/api/v1/alumnos/{id}/retrasos` | Auth | `docente`, `admin` | Histórico paginado (`?curso_escolar=&page=&limit=`) |
+
+## Notificaciones
+
+| Método | Endpoint | Auth | Roles / regla | Descripción |
+|--------|----------|------|---------------|-------------|
+| GET | `/api/v1/notificaciones` | Auth | solo propias | Bandeja paginada (`?leida=&page=&limit=`) + `no_leidas` |
+| PATCH | `/api/v1/notificaciones/{id}` | Auth | destinatario | Marcar leída / no leída |
+| POST | `/api/v1/notificaciones/suscripciones` | Auth | — | Registrar Web Push (`201` o `200` si ya existía) |
+| DELETE | `/api/v1/notificaciones/suscripciones/{id}` | Auth | dueño | Eliminar suscripción (`204`) |
+
+Las notificaciones **no se crean desde la API**: las generan los servicios ante eventos de negocio.
+
+## Auditoría
+
+| Método | Endpoint | Auth | Roles | Descripción |
+|--------|----------|------|-------|-------------|
+| GET | `/api/v1/auditoria` | Auth | `admin`, `directiva` | Registro paginado (solo lectura) |
+
 ## Health
 
 | Método | Endpoint | Auth | Descripción |
@@ -123,6 +151,9 @@ abierto → en_proceso → resuelto → cerrado
 ## Pendiente de decisión (módulos posteriores)
 
 - Detalle del algoritmo de guardias por rondas.
-- Campos definitivos de anuncios/tickets/FEM al implementar cada módulo.
 - Formato exacto del payload de firma PDF.
 - Librerías concretas de PDF, email y Web Push.
+- Campos de `UsuarioMePatch` para autocompletar PDF sin OAuth.
+- Si el autor puede corregir o borrar un retraso mal registrado, y en qué plazo.
+- Preferencias de canal de notificación y plazo de conservación de notificaciones/auditoría.
+- Fuente canónica de alumnado (`alumno_id`) compartida con FEM/retrasos.

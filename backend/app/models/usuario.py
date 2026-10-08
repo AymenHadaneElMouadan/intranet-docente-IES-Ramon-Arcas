@@ -22,6 +22,11 @@ class UsuarioEstado(str, Enum):
     inactivo = "inactivo"
 
 
+class OrigenAlta(str, Enum):
+    manual = "manual"
+    oauth = "oauth"
+
+
 class BloqueHorario(BaseModel):
     inicio: str
     fin: str
@@ -40,6 +45,7 @@ class UsuarioPublic(BaseModel):
     departamento: str
     roles: list[str]
     estado: UsuarioEstado
+    origen_alta: OrigenAlta | None = None
 
 
 class UsuarioMe(UsuarioPublic):
@@ -59,6 +65,24 @@ class UsuarioPatch(BaseModel):
     departamento: str | None = None
     roles: list[Role] | None = None
     estado: UsuarioEstado | None = None
+
+
+class UsuarioMePatch(BaseModel):
+    """Campos que el propio usuario puede rectificar (RGPD)."""
+
+    name: str | None = None
+
+
+class UsuarioRolesPut(BaseModel):
+    roles: list[Role] = Field(min_length=1)
+
+
+class UsuarioDatosPersonales(BaseModel):
+    usuario: UsuarioPublic
+    exportado_en: datetime
+    ausencias: list[dict[str, Any]] = Field(default_factory=list)
+    tickets: list[dict[str, Any]] = Field(default_factory=list)
+    suscripciones_push: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PaginatedUsuarios(BaseModel):
@@ -85,6 +109,7 @@ class GoogleAuthRequest(BaseModel):
 
 def doc_to_usuario(doc: dict[str, Any]) -> UsuarioPublic:
     """Convierte un documento Mongo a UsuarioPublic."""
+    origen = doc.get("origen_alta")
     return UsuarioPublic(
         id=str(doc["_id"]),
         name=doc["name"],
@@ -92,6 +117,7 @@ def doc_to_usuario(doc: dict[str, Any]) -> UsuarioPublic:
         departamento=doc.get("departamento", ""),
         roles=list(doc.get("roles", [])),
         estado=UsuarioEstado(doc.get("estado", UsuarioEstado.pendiente.value)),
+        origen_alta=OrigenAlta(origen) if origen else None,
     )
 
 

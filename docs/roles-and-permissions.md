@@ -31,7 +31,8 @@ Ejemplo: `GET /ausencias/{id}/pdf` requiere autenticación **y** ser el dueño (
 | Capacidad | admin | directiva | jefatura | docente | tutor | responsable_ticket |
 |-----------|:-----:|:---------:|:--------:|:-------:|:-----:|:------------------:|
 | Listar / gestionar usuarios | sí | — | — | — | — | — |
-| Ver / publicar anuncios | sí | sí | leer | leer; publicar según política | leer | leer |
+| Rectificar / exportar datos propios (RGPD) | sí* | sí* | sí* | sí* | sí* | sí* |
+| Ver / publicar anuncios | sí | sí | leer | leer | leer | leer |
 | Fijar anuncios | sí | — | — | — | — | — |
 | Consultar guardias | sí | sí | sí | sí | sí | sí |
 | Asignar / modificar guardias | sí | — | sí | — | — | — |
@@ -39,10 +40,15 @@ Ejemplo: `GET /ausencias/{id}/pdf` requiere autenticación **y** ser el dueño (
 | Justificante / PDF / firma (propias) | sí* | sí* | sí* | sí* | sí* | sí* |
 | Crear / ver tickets | sí | sí | sí | sí | sí | sí |
 | Transicionar estado de ticket | sí | — | — | — | — | sí (asignados) |
-| Comentarios en ticket | sí | — | — | sí (propios) | — | sí |
+| Comentarios en ticket | sí | sí† | sí† | sí† | sí† | sí |
 | FEM alumnos / horas | sí | — | — | — | sí | — |
 | Dashboard KPIs | sí | sí | — | — | — | — |
+| Registrar / consultar retrasos | sí | — | — | sí | — | — |
+| Bandeja / suscripciones notificaciones | sí* | sí* | sí* | sí* | sí* | sí* |
+| Consultar auditoría | sí | sí | — | — | — | — |
 | `GET /auth/me` | sí | sí | sí | sí | sí | sí |
+
+† Involucrados: solicitante, asignado o roles con privilegio (`admin`, `responsable_ticket`).
 
 \* Sobre recursos de los que es dueño, salvo que un rol superior tenga permiso administrativo explícito (por definir al implementar).
 

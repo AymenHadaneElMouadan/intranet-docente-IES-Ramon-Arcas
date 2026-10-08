@@ -4,10 +4,11 @@ PWA de gestión interna para profesorado y equipo directivo. Forma parte del Pro
 
 ## Estado actual
 
-Cimientos ejecutables:
+Cimientos ejecutables (base Adrián + módulos Aymen en esta rama):
 
 - Contrato API OpenAPI 3.x (`openapi/openapi.yaml`) alineado a la norma FastAPI (`detail`, paginación, `Location`)
-- Backend FastAPI: health, auth Google+JWT+refresh HttpOnly (Redis), usuarios
+- Backend FastAPI: health, auth Google+JWT+refresh HttpOnly (Redis), usuarios (+ RGPD), anuncios, tickets, FEM, dashboard
+- Contrato preparado: retrasos, notificaciones, auditoría (runtime pendiente)
 - Frontend Vite/React: login Google, `auth/me`, horario propio
 - Docker Compose: MongoDB, Redis, backend
 
@@ -62,5 +63,6 @@ Configura `GOOGLE_CLIENT_ID` (backend) y `VITE_GOOGLE_CLIENT_ID` (frontend) para
 ## Próximos pasos
 
 1. Validar contrato con el profesorado.
-2. Módulos Aymen: anuncios, tickets, FEM, dashboard.
+2. Módulos Aymen (en curso en rama `Aymen`): anuncios, tickets, FEM, dashboard + contrato RGPD/retrasos/notificaciones/auditoría.
 3. Módulos Adrian (siguientes): guardias, ausencias, firma PDF.
+4. Implementar runtime de retrasos, notificaciones y auditoría sobre la norma `{detail}`.
