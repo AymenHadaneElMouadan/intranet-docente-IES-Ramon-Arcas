@@ -9,9 +9,14 @@ from app.core.deps import CurrentActiveUser, require_roles
 from app.models.usuario import (
     Horario,
     PaginatedUsuarios,
+    Role,
     UsuarioCreate,
+    UsuarioDatosPersonales,
+    UsuarioEstado,
+    UsuarioMePatch,
     UsuarioPatch,
     UsuarioPublic,
+    UsuarioRolesPut,
 )
 from app.services import usuario_service
 
@@ -22,12 +27,19 @@ router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 async def list_usuarios(
     _admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
     departamento: str | None = None,
+    estado: UsuarioEstado | None = None,
+    rol: Role | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> PaginatedUsuarios:
     """Listado paginado; solo admin activo."""
     return await usuario_service.list_usuarios(
-        get_db(), departamento=departamento, page=page, limit=limit
+        get_db(),
+        departamento=departamento,
+        estado=estado,
+        rol=rol,
+        page=page,
+        limit=limit,
     )
 
 
@@ -47,6 +59,18 @@ async def create_usuario(
 async def get_me(current: CurrentActiveUser) -> UsuarioPublic:
     """Perfil del usuario autenticado (cuenta activa)."""
     return current
+
+
+@router.patch("/me", response_model=UsuarioPublic)
+async def patch_me(payload: UsuarioMePatch, current: CurrentActiveUser) -> UsuarioPublic:
+    """Rectificar datos propios (RGPD)."""
+    return await usuario_service.patch_me(get_db(), current.id, payload)
+
+
+@router.get("/me/datos", response_model=UsuarioDatosPersonales)
+async def get_me_datos(current: CurrentActiveUser) -> UsuarioDatosPersonales:
+    """Exportar datos personales propios (RGPD)."""
+    return await usuario_service.export_me_datos(get_db(), current)
 
 
 @router.get("/me/horario", response_model=Horario)
@@ -88,3 +112,13 @@ async def patch_usuario(
 ) -> UsuarioPublic:
     """Actualización parcial (aprobar alta, roles, departamento…)."""
     return await usuario_service.patch_usuario(get_db(), id, payload)
+
+
+@router.put("/{id}/roles", response_model=UsuarioPublic)
+async def put_usuario_roles(
+    payload: UsuarioRolesPut,
+    id: Annotated[str, Path()],
+    _admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
+) -> UsuarioPublic:
+    """Sustituye la lista completa de roles."""
+    return await usuario_service.put_roles(get_db(), id, payload)
