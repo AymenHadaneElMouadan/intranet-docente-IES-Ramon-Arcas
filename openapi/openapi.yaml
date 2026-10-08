@@ -438,6 +438,7 @@ paths:
           required: false
           schema:
             type: string
+          example: Informatica
       responses:
         '200':
           description: Lista de anuncios
@@ -447,6 +448,21 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Anuncio'
+              example:
+                - id: "64f1a2b3c4d5e6f7a8b9c0a1"
+                  titulo: Reunion de claustro
+                  cuerpo: Convocatoria ordinaria el martes a las 17:00 en el salon de actos.
+                  departamento: null
+                  fijado: true
+                  expira_en: null
+                  creado_en: "2026-10-01T08:00:00Z"
+                - id: "64f1a2b3c4d5e6f7a8b9c0a2"
+                  titulo: Entrega de memorias DAW
+                  cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+                  departamento: Informatica
+                  fijado: false
+                  expira_en: "2026-10-30T23:59:59Z"
+                  creado_en: "2026-10-05T10:15:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
@@ -461,6 +477,11 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AnuncioCreate'
+            example:
+              titulo: Entrega de memorias DAW
+              cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+              departamento: Informatica
+              expira_en: "2026-10-30T23:59:59Z"
       responses:
         '201':
           description: Anuncio creado
@@ -468,16 +489,31 @@ paths:
             Location:
               schema:
                 type: string
+                example: /api/v1/anuncios/64f1a2b3c4d5e6f7a8b9c0a2
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Anuncio'
+              example:
+                id: "64f1a2b3c4d5e6f7a8b9c0a2"
+                titulo: Entrega de memorias DAW
+                cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+                departamento: Informatica
+                fijado: false
+                expira_en: "2026-10-30T23:59:59Z"
+                creado_en: "2026-10-05T10:15:00Z"
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: Sin permisos (hace falta admin o directiva)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              example:
+                detail: "Se requiere uno de estos roles: admin, directiva"
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -500,6 +536,8 @@ paths:
               properties:
                 fijado:
                   type: boolean
+            example:
+              fijado: true
       responses:
         '200':
           description: Anuncio actualizado
@@ -507,12 +545,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Anuncio'
+              example:
+                id: "64f1a2b3c4d5e6f7a8b9c0a2"
+                titulo: Entrega de memorias DAW
+                cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+                departamento: Informatica
+                fijado: true
+                expira_en: "2026-10-30T23:59:59Z"
+                creado_en: "2026-10-05T10:15:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Anuncio no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              example:
+                detail: Anuncio no encontrado
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -1576,6 +1628,14 @@ components:
         creado_en:
           type: string
           format: date-time
+      example:
+        id: "64f1a2b3c4d5e6f7a8b9c0a2"
+        titulo: Entrega de memorias DAW
+        cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+        departamento: Informatica
+        fijado: false
+        expira_en: "2026-10-30T23:59:59Z"
+        creado_en: "2026-10-05T10:15:00Z"
 
     AnuncioCreate:
       type: object
@@ -1592,6 +1652,11 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        titulo: Entrega de memorias DAW
+        cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+        departamento: Informatica
+        expira_en: "2026-10-30T23:59:59Z"
 
     Guardia:
       type: object
