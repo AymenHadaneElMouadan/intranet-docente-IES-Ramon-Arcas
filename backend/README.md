@@ -2,6 +2,11 @@
 
 API REST de la Intranet Docente.
 
+## Módulos con runtime
+
+Auth, usuarios (RGPD), anuncios, tickets, FEM, dashboard y health.  
+Contrato sin implementar aún: guardias, ausencias, retrasos, notificaciones, auditoría.
+
 ## Arranque local (API en el host)
 
 1. Levanta Mongo y Redis: `docker compose up mongo redis -d`
@@ -30,8 +35,12 @@ API en `http://localhost:8000` — documentación interactiva en `/docs`.
 
 - Access JWT: header Bearer; en el frontend solo en memoria (se recupera con cookie refresh).
 - Refresh: cookie HttpOnly; Redis.
-- Cuentas `pendiente`: pueden `/auth/me` y logout; no endpoints de negocio hasta `activo`.
+- Roles de autorización se leen de Mongo en cada request (no se confían los del JWT).
+- JWT con `sub` inválido o usuario inexistente → **401** (no 404).
+- Cuentas `pendiente` (alta OAuth): pueden `/auth/me` y logout; el negocio exige `activo`.
+- Aprobar un alta: admin activo → `PATCH /api/v1/usuarios/{id}` con `{ "estado": "activo" }`.
 - Fuera de development: `JWT_SECRET` obligatorio y ≥32 caracteres (falla al arrancar si no).
+- `GOOGLE_CLIENT_ID` debe coincidir con el del frontend.
 
 ## Capas
 
