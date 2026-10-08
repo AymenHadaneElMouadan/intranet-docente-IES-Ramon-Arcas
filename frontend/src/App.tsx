@@ -71,8 +71,13 @@ function App() {
           <section className="card">
             <h2>Acceso</h2>
             <p>Inicia sesión con tu cuenta de Google.</p>
-            <GoogleLoginButton onLoggedIn={() => void loadSession()} />
+            <GoogleLoginButton onLoggedIn={loadSession} onError={setError} />
             {error && <p className="error">{error}</p>}
+            <p className="hint">
+              Si el login no abre o ves pantalla en blanco: permite ventanas emergentes para{' '}
+              <code>localhost:5173</code> o abre la app en Chrome/Edge del sistema (no en el preview
+              embebido del editor).
+            </p>
           </section>
         )}
 

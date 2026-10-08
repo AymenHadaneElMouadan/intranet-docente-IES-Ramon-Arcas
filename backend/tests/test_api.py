@@ -74,6 +74,17 @@ async def test_auth_me_unauthorized(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_auth_me_invalid_jwt_sub_is_401(client: AsyncClient) -> None:
+    """sub que no es ObjectId (o no existe) → 401, nunca 404."""
+    from app.core.security import create_access_token
+
+    token, _ = create_access_token(user_id="not-a-valid-objectid", roles=["docente"])
+    res = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 401
+    assert res.json()["detail"] == "No autenticado"
+
+
+@pytest.mark.asyncio
 async def test_google_rejects_unverified_email(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

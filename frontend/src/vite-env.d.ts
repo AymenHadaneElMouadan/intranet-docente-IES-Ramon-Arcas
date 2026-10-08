@@ -17,6 +17,8 @@ interface GoogleAccountsId {
   initialize: (config: {
     client_id: string
     callback: (response: CredentialResponse) => void
+    /** Usa FedCM en el botón (Chrome) para evitar popup bloqueado. */
+    use_fedcm_for_button?: boolean
   }) => void
   renderButton: (
     parent: HTMLElement,
