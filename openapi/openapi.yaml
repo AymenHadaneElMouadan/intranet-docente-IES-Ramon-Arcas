@@ -33,6 +33,12 @@ tags:
     description: Formación en Empresas Murcia — alumnado y horas
   - name: Dashboard
     description: KPIs para equipo directivo
+  - name: Retrasos
+    description: Registro de retrasos del alumnado e historico individual
+  - name: Notificaciones
+    description: Bandeja de notificaciones y suscripciones Web Push
+  - name: Auditoria
+    description: Registro de acciones sensibles (solo lectura)
   - name: Health
     description: Liveness y readiness (Docker)
 
@@ -42,8 +48,9 @@ paths:
       tags: [Auth]
       summary: Login con Google OAuth
       description: |
-        Recibe credenciales OAuth de Google y emite access + refresh token.
-        **PENDIENTE DE DECISIÓN:** forma exacta del credential y restricción de dominio.
+        Recibe `id_token` de Google Identity Services.
+        Emite access JWT en el body y refresh en cookie HttpOnly `refresh_token`.
+        Sin restriccion de dominio; usuarios nuevos quedan en estado `pendiente`.
       operationId: authGoogle
       security: []
       requestBody:
@@ -56,11 +63,16 @@ paths:
               id_token: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
       responses:
         '200':
-          description: Tokens emitidos
+          description: Access token emitido (refresh en Set-Cookie)
+          headers:
+            Set-Cookie:
+              description: Cookie HttpOnly refresh_token
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPairResponse'
+                $ref: '#/components/schemas/AccessTokenResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -73,52 +85,43 @@ paths:
       tags: [Auth]
       summary: Renovar access token
       description: |
-        Usa el refresh token (no el access token).
-        **PENDIENTE DE DECISIÓN:** body JSON vs cookie HttpOnly.
+        Lee la cookie HttpOnly `refresh_token` (no usa Bearer).
+        Valida el token opaco en Redis y emite un nuevo access JWT.
       operationId: authRefresh
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshRequest'
+      parameters:
+        - name: refresh_token
+          in: cookie
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Nuevo access token
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPairResponse'
+                $ref: '#/components/schemas/AccessTokenResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
 
   /api/v1/auth/logout:
     post:
       tags: [Auth]
       summary: Cerrar sesión
-      description: Invalida el refresh token en Redis.
+      description: Invalida el refresh en Redis y borra la cookie.
       operationId: authLogout
       security:
         - BearerAuth: []
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LogoutRequest'
       responses:
         '200':
           description: Sesión invalidada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/DetailMessage'
               example:
-                code: 200
-                msg: La operacion se ha realizado correctamente
+                detail: Sesion cerrada
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -144,6 +147,7 @@ paths:
     get:
       tags: [Usuarios]
       summary: Listado del claustro
+      description: Requiere rol admin. Admite filtro y paginacion.
       operationId: listUsuarios
       security:
         - BearerAuth: []
@@ -153,31 +157,71 @@ paths:
           required: false
           schema:
             type: string
-          description: Filtro por departamento
+          description: Filtra por departamento
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UsuarioEstado'
+        - name: rol
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/Role'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
       responses:
         '200':
-          description: Lista de usuarios
+          description: Pagina de usuarios
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Usuario'
-              example:
-                - id: "64f1a2b3c4d5e6f7a8b9c0d1"
-                  name: Jose
-                  departamento: Informatica
-                  roles: [docente]
-                  estado_alta: activo
-                - id: "64f1a2b3c4d5e6f7a8b9c0d2"
-                  name: Juan
-                  departamento: Matematicas
-                  roles: [docente, tutor]
-                  estado_alta: activo
+                $ref: '#/components/schemas/UsuarioPaginated'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    post:
+      tags: [Usuarios]
+      summary: Alta manual de usuario
+      description: El servidor asigna el id. Cabecera Location apunta al GET por id.
+      operationId: createUsuario
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioCreate'
+            example:
+              name: Pepa
+              email: pepa@example.com
+              departamento: FOL
+              roles: [docente]
+      responses:
+        '201':
+          description: Usuario creado
+          headers:
+            Location:
+              description: URL del recurso creado
+              schema:
+                type: string
+                example: /api/v1/usuarios/64f1a2b3c4d5e6f7a8b9c0d3
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /api/v1/usuarios/me:
     get:
@@ -195,6 +239,53 @@ paths:
                 $ref: '#/components/schemas/UsuarioMe'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [Usuarios]
+      summary: Rectificar datos propios (RGPD)
+      description: Solo campos de perfil propios. Departamento, roles y estado los gestiona admin.
+      operationId: patchUsuariosMe
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioMePatch'
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/usuarios/me/datos:
+    get:
+      tags: [Usuarios]
+      summary: Exportar datos personales propios (RGPD)
+      operationId: getUsuariosMeDatos
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Exportacion de datos personales
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioDatosPersonales'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /api/v1/usuarios/me/horario:
     get:
@@ -239,10 +330,31 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /api/v1/usuarios/{id}:
+    get:
+      tags: [Usuarios]
+      summary: Obtener un usuario
+      operationId: getUsuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '200':
+          description: Usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
       tags: [Usuarios]
-      summary: Modificación parcial de usuario
-      description: Ejemplo de uso — aprobar alta pendiente.
+      summary: Modificacion parcial de usuario
+      description: Ejemplo de uso — aprobar alta pendiente (`estado: activo`).
       operationId: patchUsuario
       security:
         - BearerAuth: []
@@ -255,7 +367,7 @@ paths:
             schema:
               $ref: '#/components/schemas/UsuarioPatch'
             example:
-              estado_alta: activo
+              estado: activo
               departamento: Informatica
       responses:
         '200':
@@ -263,13 +375,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
-              example:
-                code: 200
-                msg: La operacion se ha realizado correctamente
-                data:
-                  id: "64f1a2b3c4d5e6f7a8b9c0d1"
-                  estado_alta: activo
+                $ref: '#/components/schemas/Usuario'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -278,6 +384,44 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/usuarios/{id}/roles:
+    put:
+      tags: [Usuarios]
+      summary: Sustituir lista completa de roles
+      description: |
+        Reemplaza todos los roles. Impide dejar el sistema sin ningun admin (409).
+        Alternativa equivalente a enviar `roles` en PATCH; este endpoint deja la intencion explicita.
+      operationId: putUsuarioRoles
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioRolesPut'
+      responses:
+        '200':
+          description: Roles actualizados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -320,13 +464,14 @@ paths:
       responses:
         '201':
           description: Anuncio creado
+          headers:
+            Location:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
-              example:
-                code: 201
-                msg: La operacion se ha realizado correctamente
+                $ref: '#/components/schemas/Anuncio'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -357,11 +502,11 @@ paths:
                   type: boolean
       responses:
         '200':
-          description: Estado de fijado actualizado
+          description: Anuncio actualizado
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/Anuncio'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -410,7 +555,7 @@ paths:
       summary: Ejecutar asignación por rondas
       description: |
         Acción de negocio. La lógica vive en `services/guardias_service`.
-        **PENDIENTE DE DECISIÓN:** detalle del algoritmo.
+        Detalle del algoritmo: pendiente de implementacion (Fase 3).
       operationId: asignarGuardias
       security:
         - BearerAuth: []
@@ -426,7 +571,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -455,7 +600,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -491,7 +636,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/ResourceAck'
               example:
                 code: 201
                 msg: La operacion se ha realizado correctamente
@@ -529,7 +674,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/DetailMessage'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -590,7 +735,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/DetailMessage'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -646,13 +791,15 @@ paths:
       responses:
         '201':
           description: Ticket creado
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /api/v1/tickets/64f1a2b3c4d5e6f7a8b9c0d4
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
-              example:
-                code: 201
-                msg: La operacion se ha realizado correctamente
+                $ref: '#/components/schemas/Ticket'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -684,7 +831,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/Ticket'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -737,10 +884,14 @@ paths:
       responses:
         '201':
           description: Comentario creado
+          headers:
+            Location:
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/Comentario'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -802,7 +953,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageWithData'
+                $ref: '#/components/schemas/FemAlumno'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -828,6 +979,270 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DashboardKpis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/retrasos:
+    post:
+      tags: [Retrasos]
+      summary: Registrar retraso de un alumno
+      description: |
+        El docente solo registra el retraso (alumno, fecha, hora y modulo).
+        El autor (`registrado_por_id`) se toma del JWT, nunca del cuerpo.
+        Fecha futura -> 422. Duplicado mismo alumno/fecha/hora/modulo -> 409.
+      operationId: createRetraso
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetrasoCreate'
+      responses:
+        '201':
+          description: Retraso registrado
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Retraso'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/retrasos/{id}:
+    get:
+      tags: [Retrasos]
+      summary: Detalle de un retraso
+      operationId: getRetraso
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Retraso solicitado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Retraso'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/alumnos/{id}/retrasos:
+    get:
+      tags: [Retrasos]
+      summary: Historico de retrasos de un alumno
+      description: |
+        Historico individual del alumno en un curso escolar.
+        Cada consulta queda registrada en auditoria (datos de menores).
+      operationId: listAlumnoRetrasos
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+        - name: curso_escolar
+          in: query
+          required: false
+          schema:
+            type: string
+            example: 2026/2027
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Pagina de retrasos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetrasoPaginated'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/notificaciones:
+    get:
+      tags: [Notificaciones]
+      summary: Bandeja de notificaciones propias
+      description: |
+        Solo las del usuario autenticado. Las generan los servicios ante eventos;
+        no existe POST de creacion desde la API.
+      operationId: listNotificaciones
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: leida
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Pagina de notificaciones
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificacionPaginated'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/notificaciones/{id}:
+    patch:
+      tags: [Notificaciones]
+      summary: Marcar notificacion leida / no leida
+      operationId: patchNotificacion
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificacionPatch'
+      responses:
+        '200':
+          description: Notificacion actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/notificaciones/suscripciones:
+    post:
+      tags: [Notificaciones]
+      summary: Registrar suscripcion Web Push
+      operationId: createSuscripcionPush
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuscripcionPushCreate'
+      responses:
+        '200':
+          description: Suscripcion ya existente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuscripcionPush'
+        '201':
+          description: Suscripcion creada
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuscripcionPush'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v1/notificaciones/suscripciones/{id}:
+    delete:
+      tags: [Notificaciones]
+      summary: Eliminar suscripcion Web Push
+      operationId: deleteSuscripcionPush
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '204':
+          description: Suscripcion eliminada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/auditoria:
+    get:
+      tags: [Auditoria]
+      summary: Consultar registro de auditoria
+      description: |
+        Solo lectura. Acciones tipicas: login, altas/bajas/roles, guardias,
+        tickets, firma, exportacion RGPD y acceso a datos de alumnado.
+      operationId: listAuditoria
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: usuario_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: accion
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: recurso_tipo
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: recurso_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: desde
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: hasta
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Pagina de registros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistroAuditoriaPaginated'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -878,7 +1293,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ErrorDetail'
 
 components:
   securitySchemes:
@@ -902,56 +1317,71 @@ components:
       schema:
         type: string
       description: Identificador del recurso (codificado en la URL)
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
 
   responses:
     BadRequest:
-      description: Petición incorrecta
+      description: Peticion incorrecta
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 400
-            msg: Peticion incorrecta
+            detail: Peticion incorrecta
     Unauthorized:
       description: No autenticado
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 401
-            msg: No autenticado
+            detail: No autenticado
     Forbidden:
       description: Sin permisos
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 403
-            msg: No autorizado
+            detail: Se requiere uno de estos roles: admin
     NotFound:
       description: Recurso no encontrado
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 404
-            msg: Recurso no encontrado
-    UnprocessableEntity:
-      description: Validación fallida o transición inválida
+            detail: Recurso no encontrado
+    Conflict:
+      description: Conflicto (duplicado, solapamiento o transicion no valida)
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: '#/components/schemas/ErrorDetail'
           example:
-            code: 422
-            msg: Datos no validos
-            details:
-              - field: estado
-                issue: Transicion no permitida
+            detail: El recurso ya existe
+    UnprocessableEntity:
+      description: Validacion fallida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorDetail'
 
   schemas:
     Role:
@@ -964,35 +1394,24 @@ components:
         - tutor
         - responsable_ticket
 
-    MessageResponse:
+    ErrorDetail:
       type: object
-      required: [code, msg]
+      required: [detail]
       properties:
-        code:
-          type: integer
-          example: 200
-        msg:
-          type: string
-          example: La operacion se ha realizado correctamente
+        detail:
+          description: Mensaje o lista de errores de validacion (estilo FastAPI)
 
-    MessageWithData:
-      allOf:
-        - $ref: '#/components/schemas/MessageResponse'
-        - type: object
-          properties:
-            data:
-              description: Recurso afectado (forma según endpoint)
-
-    ErrorResponse:
+    DetailMessage:
       type: object
-      required: [code, msg]
+      required: [detail]
       properties:
-        code:
-          type: integer
-        msg:
+        detail:
           type: string
-        details:
-          description: Detalle opcional de validación
+
+    ResourceAck:
+      type: object
+      description: Respuesta generica de accion de negocio (modulos pendientes)
+      additionalProperties: true
 
     GoogleAuthRequest:
       type: object
@@ -1000,28 +1419,13 @@ components:
       properties:
         id_token:
           type: string
-          description: ID token de Google (forma exacta PENDIENTE DE DECISIÓN)
+          description: ID token JWT emitido por Google Identity Services
 
-    RefreshRequest:
+    AccessTokenResponse:
       type: object
-      required: [refresh_token]
-      properties:
-        refresh_token:
-          type: string
-
-    LogoutRequest:
-      type: object
-      properties:
-        refresh_token:
-          type: string
-
-    TokenPairResponse:
-      type: object
-      required: [access_token, token_type]
+      required: [access_token, token_type, expires_in]
       properties:
         access_token:
-          type: string
-        refresh_token:
           type: string
         token_type:
           type: string
@@ -1030,9 +1434,13 @@ components:
           type: integer
           description: Segundos de validez del access token
 
+    UsuarioEstado:
+      type: string
+      enum: [pendiente, activo, inactivo]
+
     Usuario:
       type: object
-      required: [id, name, departamento, roles]
+      required: [id, name, email, departamento, roles, estado]
       properties:
         id:
           type: string
@@ -1047,9 +1455,45 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Role'
-        estado_alta:
+        estado:
+          $ref: '#/components/schemas/UsuarioEstado'
+        origen_alta:
+          $ref: '#/components/schemas/OrigenAlta'
+
+    UsuarioPaginated:
+      type: object
+      required: [items, page, limit, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Usuario'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+
+    UsuarioCreate:
+      type: object
+      required: [name, email, departamento]
+      properties:
+        name:
           type: string
-          enum: [pendiente, activo, baja]
+        email:
+          type: string
+          format: email
+        departamento:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+          default: [docente]
+        estado:
+          $ref: '#/components/schemas/UsuarioEstado'
+          default: activo
 
     UsuarioMe:
       allOf:
@@ -1060,7 +1504,6 @@ components:
               type: array
               items:
                 type: string
-              description: Capacidades derivadas (opcional)
 
     UsuarioPatch:
       type: object
@@ -1073,31 +1516,42 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Role'
-        estado_alta:
+        estado:
+          $ref: '#/components/schemas/UsuarioEstado'
+
+    BloqueHorario:
+      type: object
+      required: [inicio, fin, tipo]
+      properties:
+        inicio:
           type: string
-          enum: [pendiente, activo, baja]
+          example: "08:00"
+        fin:
+          type: string
+          example: "09:00"
+        tipo:
+          type: string
+          enum: [clase, guardia, reduccion]
+        asignatura:
+          type: string
+        grupo:
+          type: string
+        aula:
+          type: string
 
     Horario:
       type: object
+      required: [usuario_id, dias]
       properties:
         usuario_id:
           type: string
-        semana:
-          type: array
-          items:
-            type: object
-            properties:
-              dia:
-                type: string
-                enum: [L, M, X, J, V]
-              franja:
-                type: string
-              asignatura:
-                type: string
-              grupo:
-                type: string
-              aula:
-                type: string
+        dias:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/BloqueHorario'
+          description: Mapa dia -> bloques (lunes, martes, ...)
 
     Anuncio:
       type: object
@@ -1323,4 +1777,239 @@ components:
         docentes_activos:
           type: integer
         alumnos_fem_activos:
+          type: integer
+
+    OrigenAlta:
+      type: string
+      enum: [manual, oauth]
+
+    UsuarioMePatch:
+      type: object
+      additionalProperties: false
+      description: |
+        Campos que el propio usuario puede rectificar.
+        PENDIENTE DE DECISION: campos de perfil para autocompletar PDF sin OAuth.
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    UsuarioRolesPut:
+      type: object
+      required: [roles]
+      additionalProperties: false
+      properties:
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Role'
+
+    UsuarioDatosPersonales:
+      type: object
+      description: Exportacion de datos personales (derecho de acceso RGPD)
+      required: [usuario, exportado_en]
+      properties:
+        usuario:
+          $ref: '#/components/schemas/Usuario'
+        exportado_en:
+          type: string
+          format: date-time
+        ausencias:
+          type: array
+          items:
+            type: object
+        tickets:
+          type: array
+          items:
+            type: object
+        suscripciones_push:
+          type: array
+          items:
+            $ref: '#/components/schemas/SuscripcionPush'
+
+    RetrasoCreate:
+      type: object
+      required: [alumno_id, fecha, hora, modulo]
+      additionalProperties: false
+      properties:
+        alumno_id:
+          type: string
+        fecha:
+          type: string
+          format: date
+        hora:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          example: "08:20"
+        modulo:
+          type: string
+          minLength: 1
+
+    Retraso:
+      type: object
+      required: [id, alumno_id, fecha, hora, modulo, curso_escolar, registrado_por_id]
+      properties:
+        id:
+          type: string
+        alumno_id:
+          type: string
+        fecha:
+          type: string
+          format: date
+        hora:
+          type: string
+        modulo:
+          type: string
+        grupo:
+          type: string
+        curso_escolar:
+          type: string
+          example: 2026/2027
+        registrado_por_id:
+          type: string
+        creado_en:
+          type: string
+          format: date-time
+
+    RetrasoPaginated:
+      type: object
+      required: [items, page, limit, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Retraso'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+
+    NotificacionTipo:
+      type: string
+      enum: [anuncio_destacado, guardia_asignada, horario_modificado, ticket_estado]
+
+    Notificacion:
+      type: object
+      required: [id, tipo, titulo, leida, creada_en]
+      properties:
+        id:
+          type: string
+        tipo:
+          $ref: '#/components/schemas/NotificacionTipo'
+        titulo:
+          type: string
+        mensaje:
+          type: string
+        recurso_tipo:
+          type: string
+          nullable: true
+        recurso_id:
+          type: string
+          nullable: true
+        leida:
+          type: boolean
+        creada_en:
+          type: string
+          format: date-time
+
+    NotificacionPaginated:
+      type: object
+      required: [items, page, limit, total, no_leidas]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notificacion'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        no_leidas:
+          type: integer
+
+    NotificacionPatch:
+      type: object
+      required: [leida]
+      additionalProperties: false
+      properties:
+        leida:
+          type: boolean
+
+    SuscripcionPushCreate:
+      type: object
+      required: [endpoint, keys]
+      additionalProperties: false
+      properties:
+        endpoint:
+          type: string
+          format: uri
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh:
+              type: string
+            auth:
+              type: string
+        dispositivo:
+          type: string
+          maxLength: 100
+
+    SuscripcionPush:
+      type: object
+      required: [id, creada_en]
+      description: Las claves de la suscripcion nunca se devuelven al cliente
+      properties:
+        id:
+          type: string
+        dispositivo:
+          type: string
+          nullable: true
+        creada_en:
+          type: string
+          format: date-time
+
+    RegistroAuditoria:
+      type: object
+      required: [id, usuario_id, accion, recurso_tipo, fecha]
+      properties:
+        id:
+          type: string
+        usuario_id:
+          type: string
+        usuario_nombre:
+          type: string
+        accion:
+          type: string
+        recurso_tipo:
+          type: string
+        recurso_id:
+          type: string
+          nullable: true
+        fecha:
+          type: string
+          format: date-time
+        detalle:
+          type: object
+          nullable: true
+
+    RegistroAuditoriaPaginated:
+      type: object
+      required: [items, page, limit, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistroAuditoria'
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
           type: integer

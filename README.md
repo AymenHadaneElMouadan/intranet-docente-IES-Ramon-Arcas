@@ -4,21 +4,41 @@ PWA de gestión interna para profesorado y equipo directivo. Forma parte del Pro
 
 ## Estado actual
 
-Estructura base del repositorio:
+Cimientos ejecutables (base Adrián + módulos Aymen en esta rama):
 
-- Contrato API OpenAPI 3.x (`openapi/openapi.yaml`)
-- Documentación canónica (`docs/`)
-- Reglas Cursor (`AGENTS.md`, `.cursor/rules/`)
-- Esqueleto de carpetas `frontend/` y `backend/`
-- Stub de `docker-compose.yml`
+- Contrato API OpenAPI 3.x (`openapi/openapi.yaml`) alineado a la norma FastAPI (`detail`, paginación, `Location`)
+- Backend FastAPI: health, auth Google+JWT+refresh HttpOnly (Redis), usuarios (+ RGPD), anuncios, tickets, FEM, dashboard
+- Contrato preparado: retrasos, notificaciones, auditoría (runtime pendiente)
+- Frontend Vite/React: login Google, `auth/me`, horario propio
+- Docker Compose: MongoDB, Redis, backend
 
-**Aún no** hay lógica de negocio ni UI implementada.
+## Arranque rápido
+
+```bash
+# 1) Variables del backend
+copy backend\.env.example backend\.env
+
+# 2) Infra + API
+docker compose up --build
+
+# 3) Frontend (otra terminal)
+cd frontend
+copy .env.example .env
+npm install
+npm run dev
+```
+
+- API: http://localhost:8000/docs  
+- Front: http://localhost:5173  
+- Health: http://localhost:8000/health  
+
+Configura `GOOGLE_CLIENT_ID` (backend) y `VITE_GOOGLE_CLIENT_ID` (frontend) para el login real con Google.
 
 ## Ver el contrato en Swagger Editor
 
 1. Abre [https://editor.swagger.io](https://editor.swagger.io)
-2. File → Import file (o pega el contenido de `openapi/openapi.yaml`)
-3. Revisa los tags (grupos): Auth, Usuarios, Anuncios, Guardias, Ausencias, Tickets, FEM, Dashboard, Health
+2. File → Import file (`openapi/openapi.yaml`)
+3. Tags: Auth, Usuarios, Anuncios, Guardias, Ausencias, Tickets, FEM, Dashboard, Health
 
 ## Documentación
 
@@ -28,23 +48,21 @@ Estructura base del repositorio:
 | [docs/architecture.md](docs/architecture.md) | Stack y capas |
 | [docs/api-contract.md](docs/api-contract.md) | Tabla oficial de endpoints |
 | [docs/roles-and-permissions.md](docs/roles-and-permissions.md) | Roles y permisos |
-| [openapi/openapi.yaml](openapi/openapi.yaml) | Contrato OpenAPI (fuente Swagger) |
+| [openapi/openapi.yaml](openapi/openapi.yaml) | Contrato OpenAPI |
 
-## Estructura prevista
+## Estructura
 
 ```
-intranet-docente-ies/
-├── frontend/          # React + Vite + TypeScript (PWA)
+├── frontend/          # React + Vite + TypeScript
 ├── backend/           # FastAPI
-│   ├── app/
-│   └── tests/
 ├── openapi/
 ├── docs/
-└── docker-compose.yml # MongoDB, Redis, backend
+└── docker-compose.yml
 ```
 
-## Próximos pasos (fuera de este commit)
+## Próximos pasos
 
-1. Scaffold ejecutable: FastAPI con `/health` + Vite app vacía.
-2. Auth Google + JWT + Redis para refresh tokens.
-3. Implementar endpoints por grupos según el contrato OpenAPI.
+1. Validar contrato con el profesorado.
+2. Módulos Aymen (en curso en rama `Aymen`): anuncios, tickets, FEM, dashboard + contrato RGPD/retrasos/notificaciones/auditoría.
+3. Módulos Adrian (siguientes): guardias, ausencias, firma PDF.
+4. Implementar runtime de retrasos, notificaciones y auditoría sobre la norma `{detail}`.
