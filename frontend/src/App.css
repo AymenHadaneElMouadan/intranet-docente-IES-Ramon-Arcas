@@ -238,3 +238,75 @@ button:hover {
 code {
   font-size: 0.9em;
 }
+
+.anuncio-form {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.anuncio-form h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.anuncio-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+
+.anuncio-form input,
+.anuncio-form textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+}
+
+.anuncios-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.anuncio-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  background: #fff;
+}
+
+.anuncio-item h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.anuncio-fijado {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.anuncio-cuerpo {
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+}
+
+.anuncio-meta {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+}
+
+.badge-fijado {
+  border-color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
+}

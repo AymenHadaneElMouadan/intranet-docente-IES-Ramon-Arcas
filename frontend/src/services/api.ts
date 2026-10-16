@@ -182,6 +182,45 @@ export async function patchUsuario(
   })
 }
 
+export type Anuncio = {
+  id: string
+  titulo: string
+  cuerpo: string
+  departamento: string | null
+  fijado: boolean
+  expira_en: string | null
+  creado_en: string | null
+  autor_id?: string | null
+}
+
+export type AnuncioCreatePayload = {
+  titulo: string
+  cuerpo: string
+  departamento?: string | null
+  expira_en?: string | null
+}
+
+export async function listAnuncios(departamento?: string): Promise<Anuncio[]> {
+  const q = new URLSearchParams()
+  if (departamento) q.set('departamento', departamento)
+  const suffix = q.toString() ? `?${q.toString()}` : ''
+  return apiFetch<Anuncio[]>(`/api/v1/anuncios${suffix}`)
+}
+
+export async function createAnuncio(payload: AnuncioCreatePayload): Promise<Anuncio> {
+  return apiFetch<Anuncio>('/api/v1/anuncios', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function fijarAnuncio(id: string, fijado: boolean): Promise<Anuncio> {
+  return apiFetch<Anuncio>(`/api/v1/anuncios/${id}/fijar`, {
+    method: 'PATCH',
+    body: JSON.stringify({ fijado }),
+  })
+}
+
 export async function logout(): Promise<void> {
   try {
     await apiFetch('/api/v1/auth/logout', { method: 'POST' })
