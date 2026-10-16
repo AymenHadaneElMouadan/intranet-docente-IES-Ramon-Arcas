@@ -43,8 +43,8 @@ export function HomePage({ user, horario, onLogout }: Props) {
           <dd>{user.departamento || '—'}</dd>
         </dl>
         <p className="hint modules-placeholder">
-          Módulos de negocio (anuncios, tickets, FEM…) llegarán en la Fase 2. Por ahora solo
-          cimientos: identidad y permisos base.
+          El tablón de anuncios está más abajo en esta misma página. Tickets, FEM y el resto
+          de módulos de Fase 2 se irán añadiendo después.
         </p>
       </section>
 
