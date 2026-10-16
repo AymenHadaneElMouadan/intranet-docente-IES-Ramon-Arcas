@@ -310,3 +310,157 @@ code {
   background: #fef3c7;
   color: #92400e;
 }
+
+.ticket-filters select,
+.ticket-form select,
+.ticket-form input,
+.ticket-form textarea,
+.comentario-form textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+}
+
+.ticket-form {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.ticket-form h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.ticket-form label,
+.comentario-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+
+.tickets-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ticket-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  background: #fff;
+}
+
+.ticket-item h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.ticket-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ticket-desc {
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+}
+
+.ticket-meta {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+}
+
+.ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.badge-tipo-rmi {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.badge-tipo-compras {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.badge-tipo-rrss {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #5b21b6;
+}
+
+.badge-tipo-otro {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.badge-estado-abierto {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.badge-estado-en_proceso {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.badge-estado-resuelto {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.badge-estado-cerrado {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.ticket-comentarios {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.ticket-comentarios h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.comentarios-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.comentario-cuerpo {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.comentario-form {
+  display: grid;
+  gap: 0.5rem;
+}

@@ -4,6 +4,7 @@ import { UsuariosAdmin } from './components/UsuariosAdmin'
 import { AnunciosPage } from './pages/AnunciosPage'
 import { HomePage } from './pages/HomePage'
 import { PendingPage } from './pages/PendingPage'
+import { TicketsPage } from './pages/TicketsPage'
 import {
   bootstrapSession,
   fetchMe,
@@ -93,6 +94,7 @@ function App() {
           <>
             <HomePage user={user} horario={horario} onLogout={() => void onLogout()} />
             <AnunciosPage roles={user.roles} />
+            <TicketsPage roles={user.roles} userId={user.id} />
             <UsuariosAdmin enabled={user.roles.includes('admin')} />
           </>
         )}

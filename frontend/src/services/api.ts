@@ -221,6 +221,78 @@ export async function fijarAnuncio(id: string, fijado: boolean): Promise<Anuncio
   })
 }
 
+export type TicketTipo = 'rmi' | 'rrss' | 'compras' | 'otro'
+export type TicketEstado = 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'
+
+export type Ticket = {
+  id: string
+  tipo: TicketTipo
+  estado: TicketEstado
+  titulo: string
+  descripcion: string | null
+  solicitante_id: string
+  asignado_id: string | null
+  creado_en: string | null
+}
+
+export type TicketCreatePayload = {
+  tipo: TicketTipo
+  titulo: string
+  descripcion?: string | null
+}
+
+export type TicketPatchPayload = {
+  estado?: TicketEstado
+  asignado_id?: string | null
+}
+
+export type TicketComentario = {
+  id: string
+  autor_id: string
+  cuerpo: string
+  creado_en: string
+  ticket_id?: string | null
+}
+
+export async function listTickets(params: {
+  tipo?: TicketTipo
+  estado?: TicketEstado
+} = {}): Promise<Ticket[]> {
+  const q = new URLSearchParams()
+  if (params.tipo) q.set('tipo', params.tipo)
+  if (params.estado) q.set('estado', params.estado)
+  const suffix = q.toString() ? `?${q.toString()}` : ''
+  return apiFetch<Ticket[]>(`/api/v1/tickets${suffix}`)
+}
+
+export async function createTicket(payload: TicketCreatePayload): Promise<Ticket> {
+  return apiFetch<Ticket>('/api/v1/tickets', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function patchTicket(id: string, payload: TicketPatchPayload): Promise<Ticket> {
+  return apiFetch<Ticket>(`/api/v1/tickets/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function listTicketComentarios(id: string): Promise<TicketComentario[]> {
+  return apiFetch<TicketComentario[]>(`/api/v1/tickets/${id}/comentarios`)
+}
+
+export async function createTicketComentario(
+  id: string,
+  cuerpo: string,
+): Promise<TicketComentario> {
+  return apiFetch<TicketComentario>(`/api/v1/tickets/${id}/comentarios`, {
+    method: 'POST',
+    body: JSON.stringify({ cuerpo }),
+  })
+}
+
 export async function logout(): Promise<void> {
   try {
     await apiFetch('/api/v1/auth/logout', { method: 'POST' })
