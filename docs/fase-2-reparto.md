@@ -20,7 +20,8 @@ Acuerdo operativo entre **Adrian** y **Aymen**. Misma carga funcional, no mismo 
 | FEM (listado + horas + mapa Leaflet) | Aymen | Adrian | Prefijo `/api/v1/fem`; progreso respecto a 500 h |
 | Dashboard KPIs (esqueleto + datos disponibles) | Aymen | Adrian | Solo KPIs alimentables; umbral retrasos cuando exista API |
 | PWA shell (layout desktop/móvil) + onboarding | Aymen | Adrian | Visual Aymen; Adrian debe poder explicar HTML/CSS |
-| Roles/permisos capa completa + auditoría mínima | Adrian | Aymen | Matriz real; `GET /api/v1/auditoria` + registro login/CRUD usuarios (arranque hecho) |
+| Roles/permisos capa completa + auditoría mínima | Adrian | Aymen | Backend auditoría cerrado en `feature/auditoria-roles`; UI consulta → rama aparte |
+
 | Retrasos (alta + histórico; sin stats al docente) | Adrian | Aymen | Stats solo vía Dashboard |
 | Emplazamiento en aula | Adrian | Aymen | Diseños configurables + asociación a clase |
 | Docker / CI básica / hardening `.env` | Adrian | Aymen | Continuación de infra |
@@ -28,9 +29,17 @@ Acuerdo operativo entre **Adrian** y **Aymen**. Misma carga funcional, no mismo 
 ## Flujo Git por feature
 
 1. Dueño: `feature/<nombre>` → implementa → commits principales (mensajes en español).
-2. Revisor: no toca los mismos ficheros a la vez; aporta tests, examples OpenAPI, docs o la otra capa.
-3. Antes de merge: el revisor explica el diff (voz / Discord).
-4. Rotad dueño/revisor entre sprints cuando un bloque lo permita.
+2. **Una rama / un PR por bloque** (no mezclar retrasos + emplazamiento + CI en la misma rama).
+3. Revisor: no toca los mismos ficheros a la vez; aporta tests, examples OpenAPI, docs o la otra capa.
+4. Antes de merge: el revisor explica el diff (voz / Discord).
+5. Rotad dueño/revisor entre sprints cuando un bloque lo permita.
+
+## Estado Adrian — roles / auditoría
+
+| Pieza | Estado | Rama |
+|-------|--------|------|
+| Backend auditoría (filtros fecha, eventos auth, antes/después, tests) | Hecho en `feature/auditoria-roles` | `feature/auditoria-roles` |
+| UI consulta auditoría (React) | Pendiente | Rama aparte tras merge del backend |
 
 ## Fuera de Fase 2 (no abrir aún)
 

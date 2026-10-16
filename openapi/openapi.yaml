@@ -1315,8 +1315,11 @@ paths:
       tags: [Auditoria]
       summary: Consultar registro de auditoria
       description: |
-        Solo lectura. Acciones tipicas: login, altas/bajas/roles, guardias,
-        tickets, firma, exportacion RGPD y acceso a datos de alumnado.
+        Solo lectura. Roles: `admin`, `directiva`.
+        Acciones runtime actuales: `auth.login_google`, `auth.login_failed`,
+        `auth.logout`, `usuarios.create`, `usuarios.patch`, `usuarios.put_roles`.
+        Filtros de fecha (`desde`/`hasta`) en ISO 8601 con zona; si `desde` > `hasta` → 422.
+        Mutaciones de usuarios exigen persistir auditoría (503 si falla Mongo).
       operationId: listAuditoria
       security:
         - BearerAuth: []
@@ -1331,6 +1334,7 @@ paths:
           required: false
           schema:
             type: string
+            example: usuarios.put_roles
         - name: recurso_tipo
           in: query
           required: false
@@ -1347,12 +1351,14 @@ paths:
           schema:
             type: string
             format: date-time
+          example: "2026-10-01T00:00:00Z"
         - name: hasta
           in: query
           required: false
           schema:
             type: string
             format: date-time
+          example: "2026-10-31T23:59:59Z"
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
       responses:
@@ -1362,10 +1368,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegistroAuditoriaPaginated'
+              example:
+                items:
+                  - id: "66f0a1b2c3d4e5f678901234"
+                    usuario_id: "66f0a1b2c3d4e5f678901111"
+                    usuario_nombre: Admin
+                    accion: usuarios.put_roles
+                    recurso_tipo: usuario
+                    recurso_id: "66f0a1b2c3d4e5f678901222"
+                    fecha: "2026-10-16T08:00:00Z"
+                    detalle:
+                      antes:
+                        roles: [docente]
+                      despues:
+                        roles: [docente, tutor]
+                page: 1
+                limit: 10
+                total: 1
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /health:
     get:

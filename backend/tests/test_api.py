@@ -43,7 +43,9 @@ async def client() -> AsyncIterator[AsyncClient]:
     async with app.router.lifespan_context(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            await get_db()["usuarios"].delete_many({})
+            db = get_db()
+            await db["usuarios"].delete_many({})
+            await db["auditoria"].delete_many({})
             redis = get_redis()
             async for key in redis.scan_iter("refresh:*"):
                 await redis.delete(key)

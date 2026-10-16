@@ -133,9 +133,12 @@ Las notificaciones **no se crean desde la API**: las generan los servicios ante 
 
 | Método | Endpoint | Auth | Roles | Descripción |
 |--------|----------|------|-------|-------------|
-| GET | `/api/v1/auditoria` | Auth | `admin`, `directiva` | Registro paginado (solo lectura; filtros `usuario_id`, `accion`, `recurso_tipo`, `recurso_id`, `page`, `limit`) |
+| GET | `/api/v1/auditoria` | Auth | `admin`, `directiva` | Registro paginado (solo lectura) |
 
-Acciones registradas inicialmente en runtime: `auth.login_google`, `usuarios.create`, `usuarios.patch`, `usuarios.put_roles`.
+Filtros: `usuario_id`, `accion`, `recurso_tipo`, `recurso_id`, `desde`, `hasta` (ISO 8601), `page`, `limit` (default 10). Intervalo inválido (`desde` > `hasta`) → 422.
+
+Acciones runtime: `auth.login_google`, `auth.login_failed`, `auth.logout`, `usuarios.create`, `usuarios.patch`, `usuarios.put_roles`.  
+En `patch` / `put_roles` el `detalle` incluye `antes` y `despues`. Las mutaciones de usuarios exigen persistir la traza (503 si falla Mongo); login/logout usan best-effort con log.
 
 ## Health
 

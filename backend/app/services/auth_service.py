@@ -59,6 +59,21 @@ def verify_google_id_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="id_token inválido") from exc
 
 
+async def _audit_login_failed(
+    db: AsyncIOMotorDatabase,
+    *,
+    motivo: str,
+    email: str | None = None,
+) -> None:
+    await auditoria_service.record(
+        db,
+        accion="auth.login_failed",
+        usuario_id="anonymous",
+        recurso_tipo="auth",
+        detalle={"motivo": motivo, "email": email},
+    )
+
+
 async def login_with_google(
     db: AsyncIOMotorDatabase,
     redis: Redis,
@@ -69,14 +84,22 @@ async def login_with_google(
     Login OAuth: verifica id_token → alta o vínculo por email/sub → access JWT + cookie refresh.
     Altas nuevas quedan en estado pendiente hasta aprobación admin.
     """
-    claims = verify_google_id_token(id_token_value)
+    try:
+        claims = verify_google_id_token(id_token_value)
+    except HTTPException as exc:
+        if exc.status_code in (401, 400):
+            await _audit_login_failed(db, motivo=str(exc.detail))
+        raise
+
     email = claims.get("email")
     google_sub = claims.get("sub")
     name = claims.get("name") or (email.split("@")[0] if email else "Usuario")
     if not email or not google_sub:
+        await _audit_login_failed(db, motivo="token_incompleto", email=email)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token de Google incompleto")
     # Evita vincular cuentas con email no verificado en Google.
     if claims.get("email_verified") is not True:
+        await _audit_login_failed(db, motivo="email_no_verificado", email=email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El email de Google no está verificado",
@@ -148,7 +171,22 @@ async def refresh_access(
     return await issue_tokens(redis, response, user)
 
 
-async def logout(redis: Redis, response: Response, refresh_token: str | None) -> dict[str, str]:
+async def logout(
+    db: AsyncIOMotorDatabase,
+    redis: Redis,
+    response: Response,
+    current: UsuarioPublic,
+    refresh_token: str | None,
+) -> dict[str, str]:
     await revoke_refresh(redis, refresh_token)
     clear_refresh_cookie(response)
+    await auditoria_service.record(
+        db,
+        accion="auth.logout",
+        usuario_id=current.id,
+        usuario_nombre=current.name,
+        recurso_tipo="auth",
+        recurso_id=current.id,
+        detalle={"email": current.email},
+    )
     return {"detail": "Sesión cerrada"}

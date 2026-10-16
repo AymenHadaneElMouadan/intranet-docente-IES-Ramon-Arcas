@@ -53,14 +53,21 @@ async def create_usuario(
     db = get_db()
     user = await usuario_service.create_manual(db, payload)
     response.headers["Location"] = f"/api/v1/usuarios/{user.id}"
-    await auditoria_service.record(
+    await auditoria_service.record_required(
         db,
         accion="usuarios.create",
         usuario_id=admin.id,
         usuario_nombre=admin.name,
         recurso_tipo="usuario",
         recurso_id=user.id,
-        detalle={"email": user.email, "roles": user.roles},
+        detalle={
+            "despues": {
+                "email": user.email,
+                "roles": user.roles,
+                "estado": user.estado.value,
+                "departamento": user.departamento,
+            }
+        },
     )
     return user
 
@@ -122,15 +129,32 @@ async def patch_usuario(
 ) -> UsuarioPublic:
     """Actualización parcial (aprobar alta, roles, departamento…)."""
     db = get_db()
+    previo = await usuario_service.get_by_id(db, id)
+    if previo is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     user = await usuario_service.patch_usuario(db, id, payload)
-    await auditoria_service.record(
+    await auditoria_service.record_required(
         db,
         accion="usuarios.patch",
         usuario_id=admin.id,
         usuario_nombre=admin.name,
         recurso_tipo="usuario",
         recurso_id=user.id,
-        detalle=payload.model_dump(exclude_unset=True, mode="json"),
+        detalle={
+            "antes": {
+                "roles": previo.roles,
+                "estado": previo.estado.value,
+                "departamento": previo.departamento,
+                "name": previo.name,
+            },
+            "despues": {
+                "roles": user.roles,
+                "estado": user.estado.value,
+                "departamento": user.departamento,
+                "name": user.name,
+            },
+            "cambios": payload.model_dump(exclude_unset=True, mode="json"),
+        },
     )
     return user
 
@@ -143,14 +167,20 @@ async def put_usuario_roles(
 ) -> UsuarioPublic:
     """Sustituye la lista completa de roles."""
     db = get_db()
+    previo = await usuario_service.get_by_id(db, id)
+    if previo is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     user = await usuario_service.put_roles(db, id, payload)
-    await auditoria_service.record(
+    await auditoria_service.record_required(
         db,
         accion="usuarios.put_roles",
         usuario_id=admin.id,
         usuario_nombre=admin.name,
         recurso_tipo="usuario",
         recurso_id=user.id,
-        detalle={"roles": [r.value for r in payload.roles]},
+        detalle={
+            "antes": {"roles": previo.roles},
+            "despues": {"roles": user.roles},
+        },
     )
     return user

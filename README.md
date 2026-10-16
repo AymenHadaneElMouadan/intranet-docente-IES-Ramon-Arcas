@@ -7,10 +7,10 @@ PWA de gestión interna para profesorado y equipo directivo. Forma parte del Pro
 Base ejecutable en `main` (auth/usuarios + módulos Aymen + cierre de sesión Google):
 
 - Contrato API OpenAPI 3.x (`openapi/openapi.yaml`) alineado a la norma FastAPI (`detail`, paginación, `Location`)
-- Backend FastAPI: health, auth Google + JWT + refresh HttpOnly (Redis), usuarios (+ RGPD), anuncios, tickets, FEM, dashboard, auditoría mínima
-- Frontend Vite/React: login Google (GIS/FedCM), `auth/me`, perfil y horario propio, UI admin de usuarios (horario solo si la cuenta está `activo`)
+- Backend FastAPI: health, auth Google + JWT + refresh HttpOnly (Redis), usuarios (+ RGPD), anuncios, tickets, FEM, dashboard, **auditoría** (`GET /api/v1/auditoria`, filtros de fecha, login/logout/fallos y CRUD usuarios)
+- Frontend Vite/React: login Google (GIS/FedCM), `auth/me`, perfil y horario propio, UI admin de usuarios / anuncios (horario solo si la cuenta está `activo`)
 - Docker Compose: MongoDB, Redis, backend (healthchecks + red `intranet`)
-- **Runtime pendiente (contrato ya definido):** guardias, ausencias (+ justificante/PDF/firma), retrasos, notificaciones (runtime completo)
+- **Runtime pendiente (contrato ya definido):** guardias, ausencias (+ justificante/PDF/firma), retrasos, notificaciones (runtime completo); UI de consulta de auditoría
 
 ## Arranque rápido
 

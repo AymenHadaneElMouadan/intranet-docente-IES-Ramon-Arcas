@@ -1,5 +1,6 @@
 """Consulta de auditoría (admin y directiva)."""
 
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -17,11 +18,13 @@ router = APIRouter(prefix="/auditoria", tags=["Auditoria"])
 async def list_auditoria(
     _actor: Annotated[UsuarioPublic, Depends(require_roles("admin", "directiva"))],
     page: Annotated[int, Query(ge=1)] = 1,
-    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
     usuario_id: str | None = None,
     accion: str | None = None,
     recurso_tipo: str | None = None,
     recurso_id: str | None = None,
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
 ) -> RegistroAuditoriaPaginated:
     """Listado paginado de acciones relevantes."""
     return await auditoria_service.list_entries(
@@ -32,4 +35,6 @@ async def list_auditoria(
         accion=accion,
         recurso_tipo=recurso_tipo,
         recurso_id=recurso_id,
+        desde=desde,
+        hasta=hasta,
     )

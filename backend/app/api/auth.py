@@ -32,11 +32,13 @@ async def auth_refresh(
 @router.post("/logout")
 async def auth_logout(
     response: Response,
-    _current: CurrentUser,
+    current: CurrentUser,
     refresh_token: Annotated[str | None, Cookie(alias="refresh_token")] = None,
 ) -> dict[str, str]:
     """Invalida el refresh en Redis y borra la cookie."""
-    return await auth_service.logout(get_redis(), response, refresh_token)
+    return await auth_service.logout(
+        get_db(), get_redis(), response, current, refresh_token
+    )
 
 
 @router.get("/me", response_model=UsuarioMe)
