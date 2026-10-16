@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { GoogleLoginButton } from './components/GoogleLoginButton'
+import { HomePage } from './pages/HomePage'
+import { PendingPage } from './pages/PendingPage'
 import {
   bootstrapSession,
   fetchMe,
@@ -75,62 +77,33 @@ function App() {
             {error && <p className="error">{error}</p>}
             <p className="hint">
               Si el login no abre o ves pantalla en blanco: permite ventanas emergentes para{' '}
-              <code>localhost:5173</code> o abre la app en Chrome/Edge del sistema (no en el preview
-              embebido del editor).
+              <code>localhost:5173</code> o abre la app en Chrome/Edge del sistema (no en el
+              preview embebido del editor).
             </p>
           </section>
         )}
 
-        {!loading && user && (
-          <>
-            <section className="card">
-              <div className="row">
-                <h2>Mi perfil</h2>
-                <button type="button" onClick={() => void onLogout()}>
-                  Cerrar sesión
-                </button>
-              </div>
-              <dl className="profile">
-                <dt>Nombre</dt>
-                <dd>{user.name}</dd>
-                <dt>Email</dt>
-                <dd>{user.email}</dd>
-                <dt>Estado</dt>
-                <dd>{user.estado}</dd>
-                <dt>Roles</dt>
-                <dd>{user.roles.join(', ')}</dd>
-                <dt>Departamento</dt>
-                <dd>{user.departamento || '—'}</dd>
-              </dl>
-              {user.estado === 'pendiente' && (
-                <p className="hint">
-                  Tu alta está pendiente de confirmación por un administrador.
-                </p>
-              )}
-            </section>
+        {!loading && user?.estado === 'pendiente' && (
+          <PendingPage user={user} onLogout={() => void onLogout()} />
+        )}
 
-            {user.estado === 'activo' && (
-              <section className="card">
-                <h2>Mi horario</h2>
-                {!horario && <p>Sin horario.</p>}
-                {horario &&
-                  Object.entries(horario.dias).map(([dia, bloques]) => (
-                    <div key={dia} className="dia">
-                      <h3>{dia}</h3>
-                      {bloques.length === 0 && <p className="muted">Sin bloques</p>}
-                      <ul>
-                        {bloques.map((b, i) => (
-                          <li key={`${dia}-${i}`}>
-                            {b.inicio}–{b.fin} · {b.tipo}
-                            {b.asignatura ? ` · ${b.asignatura}` : ''}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-              </section>
-            )}
-          </>
+        {!loading && user?.estado === 'activo' && (
+          <HomePage user={user} horario={horario} onLogout={() => void onLogout()} />
+        )}
+
+        {!loading && user && user.estado !== 'pendiente' && user.estado !== 'activo' && (
+          <section className="card">
+            <div className="row">
+              <h2>Estado de cuenta</h2>
+              <button type="button" onClick={() => void onLogout()}>
+                Cerrar sesión
+              </button>
+            </div>
+            <p>
+              Tu cuenta tiene el estado <code>{user.estado}</code>, que no permite usar la
+              intranet ahora mismo. Contacta con un administrador.
+            </p>
+          </section>
         )}
       </main>
     </div>
