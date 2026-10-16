@@ -354,7 +354,7 @@ paths:
     patch:
       tags: [Usuarios]
       summary: Modificacion parcial de usuario
-      description: Ejemplo de uso — aprobar alta pendiente (`estado: activo`).
+      description: "Ejemplo de uso — aprobar alta pendiente (`estado: activo`)."
       operationId: patchUsuario
       security:
         - BearerAuth: []
@@ -438,6 +438,7 @@ paths:
           required: false
           schema:
             type: string
+          example: Informatica
       responses:
         '200':
           description: Lista de anuncios
@@ -447,6 +448,21 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Anuncio'
+              example:
+                - id: "64f1a2b3c4d5e6f7a8b9c0a1"
+                  titulo: Reunion de claustro
+                  cuerpo: "Convocatoria ordinaria el martes a las 17:00 en el salon de actos."
+                  departamento: null
+                  fijado: true
+                  expira_en: null
+                  creado_en: "2026-10-01T08:00:00Z"
+                - id: "64f1a2b3c4d5e6f7a8b9c0a2"
+                  titulo: Entrega de memorias DAW
+                  cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+                  departamento: Informatica
+                  fijado: false
+                  expira_en: "2026-10-30T23:59:59Z"
+                  creado_en: "2026-10-05T10:15:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
@@ -461,6 +477,11 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AnuncioCreate'
+            example:
+              titulo: Entrega de memorias DAW
+              cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+              departamento: Informatica
+              expira_en: "2026-10-30T23:59:59Z"
       responses:
         '201':
           description: Anuncio creado
@@ -468,16 +489,31 @@ paths:
             Location:
               schema:
                 type: string
+                example: /api/v1/anuncios/64f1a2b3c4d5e6f7a8b9c0a2
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Anuncio'
+              example:
+                id: "64f1a2b3c4d5e6f7a8b9c0a2"
+                titulo: Entrega de memorias DAW
+                cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+                departamento: Informatica
+                fijado: false
+                expira_en: "2026-10-30T23:59:59Z"
+                creado_en: "2026-10-05T10:15:00Z"
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: Sin permisos (hace falta admin o directiva)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              example:
+                detail: "Se requiere uno de estos roles: admin, directiva"
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -500,6 +536,8 @@ paths:
               properties:
                 fijado:
                   type: boolean
+            example:
+              fijado: true
       responses:
         '200':
           description: Anuncio actualizado
@@ -507,12 +545,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Anuncio'
+              example:
+                id: "64f1a2b3c4d5e6f7a8b9c0a2"
+                titulo: Entrega de memorias DAW
+                cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+                departamento: Informatica
+                fijado: true
+                expira_en: "2026-10-30T23:59:59Z"
+                creado_en: "2026-10-05T10:15:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: Anuncio no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              example:
+                detail: Anuncio no encontrado
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -760,11 +812,13 @@ paths:
           required: false
           schema:
             $ref: '#/components/schemas/TicketTipo'
+          example: rmi
         - name: estado
           in: query
           required: false
           schema:
             $ref: '#/components/schemas/TicketEstado'
+          example: abierto
       responses:
         '200':
           description: Lista de tickets
@@ -774,6 +828,23 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Ticket'
+              example:
+                - id: "64f1a2b3c4d5e6f7a8b9c0d4"
+                  tipo: rmi
+                  estado: abierto
+                  titulo: Proyector aula 12 no enciende
+                  descripcion: No da imagen desde esta manana.
+                  solicitante_id: "64f1a2b3c4d5e6f7a8b9c0b1"
+                  asignado_id: null
+                  creado_en: "2026-10-06T09:30:00Z"
+                - id: "64f1a2b3c4d5e6f7a8b9c0d5"
+                  tipo: compras
+                  estado: en_proceso
+                  titulo: Pedido de toner impresora departamento
+                  descripcion: Quedan dos unidades; solicitamos reponer stock.
+                  solicitante_id: "64f1a2b3c4d5e6f7a8b9c0b2"
+                  asignado_id: "64f1a2b3c4d5e6f7a8b9c0b3"
+                  creado_en: "2026-10-04T11:00:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
@@ -788,6 +859,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/TicketCreate'
+            example:
+              tipo: rmi
+              titulo: Proyector aula 12 no enciende
+              descripcion: No da imagen desde esta manana.
       responses:
         '201':
           description: Ticket creado
@@ -800,6 +875,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ticket'
+              example:
+                id: "64f1a2b3c4d5e6f7a8b9c0d4"
+                tipo: rmi
+                estado: abierto
+                titulo: Proyector aula 12 no enciende
+                descripcion: No da imagen desde esta manana.
+                solicitante_id: "64f1a2b3c4d5e6f7a8b9c0b1"
+                asignado_id: null
+                creado_en: "2026-10-06T09:30:00Z"
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -825,6 +909,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/TicketPatch'
+            example:
+              estado: en_proceso
+              asignado_id: "64f1a2b3c4d5e6f7a8b9c0b3"
       responses:
         '200':
           description: Ticket actualizado
@@ -832,6 +919,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ticket'
+              example:
+                id: "64f1a2b3c4d5e6f7a8b9c0d4"
+                tipo: rmi
+                estado: en_proceso
+                titulo: Proyector aula 12 no enciende
+                descripcion: No da imagen desde esta manana.
+                solicitante_id: "64f1a2b3c4d5e6f7a8b9c0b1"
+                asignado_id: "64f1a2b3c4d5e6f7a8b9c0b3"
+                creado_en: "2026-10-06T09:30:00Z"
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -841,7 +937,13 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          $ref: '#/components/responses/UnprocessableEntity'
+          description: Transicion de estado no permitida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+              example:
+                detail: "Transicion invalida: abierto -> cerrado"
 
   /api/v1/tickets/{id}/comentarios:
     get:
@@ -861,6 +963,15 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Comentario'
+              example:
+                - id: "64f1a2b3c4d5e6f7a8b9c0e1"
+                  autor_id: "64f1a2b3c4d5e6f7a8b9c0b1"
+                  cuerpo: Ya he avisado a RMI; paso por el aula a media manana.
+                  creado_en: "2026-10-06T10:05:00Z"
+                - id: "64f1a2b3c4d5e6f7a8b9c0e2"
+                  autor_id: "64f1a2b3c4d5e6f7a8b9c0b3"
+                  cuerpo: Revisado; cambiaremos la lampara del proyector.
+                  creado_en: "2026-10-06T12:40:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -881,6 +992,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ComentarioCreate'
+            example:
+              cuerpo: Revisado; cambiaremos la lampara del proyector.
       responses:
         '201':
           description: Comentario creado
@@ -888,10 +1001,16 @@ paths:
             Location:
               schema:
                 type: string
+                example: /api/v1/tickets/64f1a2b3c4d5e6f7a8b9c0d4/comentarios/64f1a2b3c4d5e6f7a8b9c0e2
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Comentario'
+              example:
+                id: "64f1a2b3c4d5e6f7a8b9c0e2"
+                autor_id: "64f1a2b3c4d5e6f7a8b9c0b3"
+                cuerpo: Revisado; cambiaremos la lampara del proyector.
+                creado_en: "2026-10-06T12:40:00Z"
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1359,7 +1478,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorDetail'
           example:
-            detail: Se requiere uno de estos roles: admin
+            detail: "Se requiere uno de estos roles: admin"
     NotFound:
       description: Recurso no encontrado
       content:
@@ -1576,6 +1695,14 @@ components:
         creado_en:
           type: string
           format: date-time
+      example:
+        id: "64f1a2b3c4d5e6f7a8b9c0a2"
+        titulo: Entrega de memorias DAW
+        cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+        departamento: Informatica
+        fijado: false
+        expira_en: "2026-10-30T23:59:59Z"
+        creado_en: "2026-10-05T10:15:00Z"
 
     AnuncioCreate:
       type: object
@@ -1592,6 +1719,11 @@ components:
           type: string
           format: date-time
           nullable: true
+      example:
+        titulo: Entrega de memorias DAW
+        cuerpo: Recordad subir la memoria intermodular antes del 30 de octubre.
+        departamento: Informatica
+        expira_en: "2026-10-30T23:59:59Z"
 
     Guardia:
       type: object
@@ -1693,6 +1825,15 @@ components:
         creado_en:
           type: string
           format: date-time
+      example:
+        id: "64f1a2b3c4d5e6f7a8b9c0d4"
+        tipo: rmi
+        estado: abierto
+        titulo: Proyector aula 12 no enciende
+        descripcion: No da imagen desde esta manana.
+        solicitante_id: "64f1a2b3c4d5e6f7a8b9c0b1"
+        asignado_id: null
+        creado_en: "2026-10-06T09:30:00Z"
 
     TicketCreate:
       type: object
@@ -1704,6 +1845,10 @@ components:
           type: string
         descripcion:
           type: string
+      example:
+        tipo: rmi
+        titulo: Proyector aula 12 no enciende
+        descripcion: No da imagen desde esta manana.
 
     TicketPatch:
       type: object
@@ -1712,6 +1857,9 @@ components:
           $ref: '#/components/schemas/TicketEstado'
         asignado_id:
           type: string
+      example:
+        estado: en_proceso
+        asignado_id: "64f1a2b3c4d5e6f7a8b9c0b3"
 
     Comentario:
       type: object
@@ -1726,6 +1874,11 @@ components:
         creado_en:
           type: string
           format: date-time
+      example:
+        id: "64f1a2b3c4d5e6f7a8b9c0e2"
+        autor_id: "64f1a2b3c4d5e6f7a8b9c0b3"
+        cuerpo: Revisado; cambiaremos la lampara del proyector.
+        creado_en: "2026-10-06T12:40:00Z"
 
     ComentarioCreate:
       type: object
@@ -1734,6 +1887,8 @@ components:
         cuerpo:
           type: string
           minLength: 1
+      example:
+        cuerpo: Revisado; cambiaremos la lampara del proyector.
 
     FemAlumno:
       type: object
