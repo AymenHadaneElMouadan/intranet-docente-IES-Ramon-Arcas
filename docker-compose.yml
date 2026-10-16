@@ -1,4 +1,4 @@
-# Stub de orquestación local — Intranet Docente
+# Orquestación local — Intranet Docente (MongoDB + Redis + API FastAPI)
 
 services:
   mongo:
@@ -7,11 +7,27 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    networks:
+      - intranet
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    networks:
+      - intranet
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   backend:
     build: ./backend
@@ -23,11 +39,31 @@ services:
       MONGODB_URI: mongodb://mongo:27017
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      - mongo
-      - redis
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
-      # Montaje en desarrollo: cambios de código sin rebuild (opcional)
+      # Desarrollo: cambios en app/ sin rebuild
       - ./backend/app:/app/app
+    networks:
+      - intranet
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+networks:
+  intranet:
+    driver: bridge
 
 volumes:
   mongo_data:

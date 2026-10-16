@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { GoogleLoginButton } from './components/GoogleLoginButton'
+import { UsuariosAdmin } from './components/UsuariosAdmin'
 import {
   bootstrapSession,
   fetchMe,
@@ -130,6 +131,10 @@ function App() {
                   ))}
               </section>
             )}
+
+            <UsuariosAdmin
+              enabled={user.estado === 'activo' && user.roles.includes('admin')}
+            />
           </>
         )}
       </main>

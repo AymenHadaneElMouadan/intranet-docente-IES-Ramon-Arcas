@@ -1,6 +1,6 @@
 # Frontend (React + Vite + TypeScript)
 
-PWA mínima de la Intranet Docente: login Google, perfil vía `auth/me` y horario propio.
+PWA mínima de la Intranet Docente: login Google, perfil vía `auth/me`, horario propio y UI admin de usuarios.
 
 ## Desarrollo
 
@@ -29,7 +29,9 @@ Tras cambiar el `.env`, reinicia Vite. Usa Chrome/Edge del sistema; el preview e
 
 ```
 src/
-├── components/   # UI (botón Google GIS, …)
+├── components/   # GoogleLoginButton, UsuariosAdmin, …
 ├── services/     # Cliente HTTP /api/v1
-└── App.tsx       # Login + perfil + horario
+└── App.tsx       # Login + perfil + horario + admin usuarios
 ```
+
+La sección **Usuarios (admin)** solo aparece si `estado === activo` y el rol `admin` está en `roles` (la API ya exige lo mismo).

@@ -29,7 +29,10 @@ copy backend\.env.example backend\.env
 docker compose up --build
 ```
 
-API en `http://localhost:8000` — documentación interactiva en `/docs`.
+Compose incluye healthchecks de Mongo, Redis y backend (`GET /health`). El API no arranca hasta que las dependencias respondan.
+
+API en `http://localhost:8000` — documentación interactiva en `/docs`.  
+Liveness: `/health` · Readiness: `/health/ready`.
 
 ## Seguridad de sesión (resumen)
 

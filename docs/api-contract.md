@@ -133,7 +133,9 @@ Las notificaciones **no se crean desde la API**: las generan los servicios ante 
 
 | Método | Endpoint | Auth | Roles | Descripción |
 |--------|----------|------|-------|-------------|
-| GET | `/api/v1/auditoria` | Auth | `admin`, `directiva` | Registro paginado (solo lectura) |
+| GET | `/api/v1/auditoria` | Auth | `admin`, `directiva` | Registro paginado (solo lectura; filtros `usuario_id`, `accion`, `recurso_tipo`, `recurso_id`, `page`, `limit`) |
+
+Acciones registradas inicialmente en runtime: `auth.login_google`, `usuarios.create`, `usuarios.patch`, `usuarios.put_roles`.
 
 ## Health
 

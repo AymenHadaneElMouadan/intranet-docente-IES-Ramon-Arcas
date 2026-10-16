@@ -18,7 +18,7 @@ from app.models.usuario import (
     UsuarioPublic,
     UsuarioRolesPut,
 )
-from app.services import usuario_service
+from app.services import auditoria_service, usuario_service
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
@@ -47,11 +47,21 @@ async def list_usuarios(
 async def create_usuario(
     payload: UsuarioCreate,
     response: Response,
-    _admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
+    admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
 ) -> UsuarioPublic:
     """Alta manual; el id lo asigna Mongo. Location apunta al GET por id."""
-    user = await usuario_service.create_manual(get_db(), payload)
+    db = get_db()
+    user = await usuario_service.create_manual(db, payload)
     response.headers["Location"] = f"/api/v1/usuarios/{user.id}"
+    await auditoria_service.record(
+        db,
+        accion="usuarios.create",
+        usuario_id=admin.id,
+        usuario_nombre=admin.name,
+        recurso_tipo="usuario",
+        recurso_id=user.id,
+        detalle={"email": user.email, "roles": user.roles},
+    )
     return user
 
 
@@ -108,17 +118,39 @@ async def get_usuario_horario(
 async def patch_usuario(
     payload: UsuarioPatch,
     id: Annotated[str, Path()],
-    _admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
+    admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
 ) -> UsuarioPublic:
     """Actualización parcial (aprobar alta, roles, departamento…)."""
-    return await usuario_service.patch_usuario(get_db(), id, payload)
+    db = get_db()
+    user = await usuario_service.patch_usuario(db, id, payload)
+    await auditoria_service.record(
+        db,
+        accion="usuarios.patch",
+        usuario_id=admin.id,
+        usuario_nombre=admin.name,
+        recurso_tipo="usuario",
+        recurso_id=user.id,
+        detalle=payload.model_dump(exclude_unset=True, mode="json"),
+    )
+    return user
 
 
 @router.put("/{id}/roles", response_model=UsuarioPublic)
 async def put_usuario_roles(
     payload: UsuarioRolesPut,
     id: Annotated[str, Path()],
-    _admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
+    admin: Annotated[UsuarioPublic, Depends(require_roles("admin"))],
 ) -> UsuarioPublic:
     """Sustituye la lista completa de roles."""
-    return await usuario_service.put_roles(get_db(), id, payload)
+    db = get_db()
+    user = await usuario_service.put_roles(db, id, payload)
+    await auditoria_service.record(
+        db,
+        accion="usuarios.put_roles",
+        usuario_id=admin.id,
+        usuario_nombre=admin.name,
+        recurso_tipo="usuario",
+        recurso_id=user.id,
+        detalle={"roles": [r.value for r in payload.roles]},
+    )
+    return user

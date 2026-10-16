@@ -32,6 +32,9 @@ No comparten base de datos, sesión ni autenticación.
 ### Infraestructura local
 
 - Docker Compose: MongoDB, Redis, backend
+- Healthchecks en los tres servicios; el backend arranca solo cuando Mongo y Redis están healthy
+- Red Docker `intranet`; volumen persistente `mongo_data`
+- Frontend: fuera de Compose (`npm run dev`)
 
 ## Capas del backend
 

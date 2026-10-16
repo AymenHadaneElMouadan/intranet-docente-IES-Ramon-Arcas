@@ -99,6 +99,37 @@ export type UsuarioMe = {
   estado: string
 }
 
+export type UsuarioPublic = {
+  id: string
+  name: string
+  email: string
+  departamento: string
+  roles: string[]
+  estado: string
+}
+
+export type PaginatedUsuarios = {
+  items: UsuarioPublic[]
+  page: number
+  limit: number
+  total: number
+}
+
+export type UsuarioCreatePayload = {
+  name: string
+  email: string
+  departamento: string
+  roles: string[]
+  estado: 'pendiente' | 'activo' | 'inactivo'
+}
+
+export type UsuarioPatchPayload = {
+  name?: string
+  departamento?: string
+  roles?: string[]
+  estado?: 'pendiente' | 'activo' | 'inactivo'
+}
+
 export type Horario = {
   usuario_id: string
   dias: Record<string, Array<{ inicio: string; fin: string; tipo: string; asignatura?: string }>>
@@ -119,6 +150,36 @@ export async function fetchMe(): Promise<UsuarioMe> {
 
 export async function fetchMiHorario(): Promise<Horario> {
   return apiFetch<Horario>('/api/v1/usuarios/me/horario')
+}
+
+export async function listUsuarios(params: {
+  page?: number
+  limit?: number
+  departamento?: string
+} = {}): Promise<PaginatedUsuarios> {
+  const q = new URLSearchParams()
+  if (params.page) q.set('page', String(params.page))
+  if (params.limit) q.set('limit', String(params.limit))
+  if (params.departamento) q.set('departamento', params.departamento)
+  const suffix = q.toString() ? `?${q.toString()}` : ''
+  return apiFetch<PaginatedUsuarios>(`/api/v1/usuarios${suffix}`)
+}
+
+export async function createUsuario(payload: UsuarioCreatePayload): Promise<UsuarioPublic> {
+  return apiFetch<UsuarioPublic>('/api/v1/usuarios', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function patchUsuario(
+  id: string,
+  payload: UsuarioPatchPayload,
+): Promise<UsuarioPublic> {
+  return apiFetch<UsuarioPublic>(`/api/v1/usuarios/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
 }
 
 export async function logout(): Promise<void> {

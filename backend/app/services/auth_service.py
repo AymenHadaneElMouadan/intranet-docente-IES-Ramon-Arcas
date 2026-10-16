@@ -16,7 +16,7 @@ from app.core.security import (
     set_refresh_cookie,
 )
 from app.models.usuario import AccessTokenResponse, UsuarioEstado, UsuarioPublic, doc_to_usuario
-from app.services import usuario_service
+from app.services import auditoria_service, usuario_service
 
 REFRESH_PREFIX = "refresh:"
 
@@ -100,6 +100,15 @@ async def login_with_google(
     else:
         user = doc_to_usuario(doc)
 
+    await auditoria_service.record(
+        db,
+        accion="auth.login_google",
+        usuario_id=user.id,
+        usuario_nombre=user.name,
+        recurso_tipo="usuario",
+        recurso_id=user.id,
+        detalle={"email": user.email, "estado": user.estado.value},
+    )
     return await issue_tokens(redis, response, user)
 
 
